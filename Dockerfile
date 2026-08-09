@@ -18,6 +18,9 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-download EasyOCR model weights during build to prevent runtime network delays on cloud hosts
+RUN python -c "import easyocr; easyocr.Reader(['en'], download_enabled=True, gpu=False)"
+
 COPY . .
 
 EXPOSE 8000

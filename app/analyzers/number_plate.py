@@ -27,6 +27,38 @@ VEHICLE_BRAND_KEYWORDS = {
 }
 
 
+CHAR_SUB_TO_DIGIT = {"O": "0", "Q": "0", "I": "1", "L": "1", "Z": "2", "S": "5", "G": "6", "T": "7", "B": "8"}
+CHAR_SUB_TO_ALPHA = {"0": "O", "1": "I", "2": "Z", "5": "S", "6": "G", "7": "T", "8": "B"}
+
+
+def normalize_indian_plate_candidate(token: str) -> List[str]:
+    """
+    Attempts to normalize OCR character confusion for Indian license plate formats.
+    E.g. KAO1AB1234 -> KA01AB1234, MH12NAQUNEWITUH8556 -> MH12NA8556
+    """
+    candidates = [token]
+    
+    # Try sliding window extraction of Indian standard pattern [A-Z]{2}...[0-9]{4}
+    # Standard format: State(2 letters) + District(1-2 digits) + Series(1-3 letters) + Number(1-4 digits)
+    m = re.search(r"([A-Z0-9]{2})([A-Z0-9]{1,2})([A-Z0-9]{1,3})([A-Z0-9]{3,4})", token)
+    if m:
+        st, dist, ser, num = m.groups()
+        # Clean state code (letters)
+        st_clean = "".join(CHAR_SUB_TO_ALPHA.get(c, c) for c in st)
+        # Clean district code (digits)
+        dist_clean = "".join(CHAR_SUB_TO_DIGIT.get(c, c) for c in dist)
+        # Clean series code (letters)
+        ser_clean = "".join(CHAR_SUB_TO_ALPHA.get(c, c) for c in ser)
+        # Clean number (digits)
+        num_clean = "".join(CHAR_SUB_TO_DIGIT.get(c, c) for c in num)
+        
+        normalized = f"{st_clean}{dist_clean}{ser_clean}{num_clean}"
+        if normalized not in candidates:
+            candidates.append(normalized)
+
+    return candidates
+
+
 class NumberPlateAnalyzer(BaseAnalyzer):
     """
     Universal License Plate Analyzer supporting Cars, Motorcycles/Bikes, Trucks, & Commercial Vehicles
@@ -46,24 +78,30 @@ class NumberPlateAnalyzer(BaseAnalyzer):
         raw_tokens = [re.sub(r"[^A-Z0-9]", "", item.get("text", "").upper()) for item in detections]
         raw_tokens = [t for t in raw_tokens if t and t not in VEHICLE_BRAND_KEYWORDS]
 
-        # Build Candidate Combinations (Individual OCR tokens + Merged adjacent tokens for 2-line bike plates)
+        # Build Candidate Combinations (Single, 2-adjacent, and 3-adjacent tokens)
         candidates: List[str] = []
 
         # Single tokens
         for t in raw_tokens:
             if len(t) >= 4:
-                candidates.append(t)
+                candidates.extend(normalize_indian_plate_candidate(t))
 
         # Joined adjacent 2 tokens (handles motorcycle 2-line plates e.g. "KA05" + "EX5678" -> "KA05EX5678")
         for i in range(len(raw_tokens) - 1):
             joined = raw_tokens[i] + raw_tokens[i + 1]
-            if 5 <= len(joined) <= 12:
-                candidates.append(joined)
+            if 5 <= len(joined) <= 14:
+                candidates.extend(normalize_indian_plate_candidate(joined))
+
+        # Joined adjacent 3 tokens (handles 3-segmented plates e.g. "DL" + "1C" + "1234" -> "DL1C1234")
+        for i in range(len(raw_tokens) - 2):
+            joined = raw_tokens[i] + raw_tokens[i + 1] + raw_tokens[i + 2]
+            if 6 <= len(joined) <= 14:
+                candidates.extend(normalize_indian_plate_candidate(joined))
 
         # Full concatenated text substring search
         full_text_cleaned = re.sub(r"[^A-Z0-9]", "", ocr_result["text"].upper())
-        if full_text_cleaned and full_text_cleaned not in candidates:
-            candidates.append(full_text_cleaned)
+        if full_text_cleaned:
+            candidates.extend(normalize_indian_plate_candidate(full_text_cleaned))
 
         best_plate = None
         best_conf = 0.0

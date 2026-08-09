@@ -228,8 +228,8 @@ document.addEventListener('DOMContentLoaded', () => {
           scoreTag = `<span class="score-badge ${cls}">Score: ${score}%</span>`;
         } else if (item.status === 'failed') {
           scoreTag = `<span class="score-badge score-low">Failed</span>`;
-        } else if (item.status === 'processing') {
-          scoreTag = `<span class="score-badge score-medium">⚙️ Processing</span>`;
+        } else if (item.status === 'pending' || item.status === 'processing') {
+          scoreTag = `<span class="score-badge score-medium">⏳ Processing...</span>`;
         }
 
         const res_px = item.width && item.height ? `${item.width}×${item.height}` : '';
@@ -251,6 +251,12 @@ document.addEventListener('DOMContentLoaded', () => {
         card.querySelector('.delete-btn').addEventListener('click', (e) => deleteImage(item.id, item.original_filename, e));
         card.addEventListener('click', () => inspectImage(item.id));
         gallery.appendChild(card);
+      }
+
+      // Auto refresh gallery if any images are still in pending/processing status
+      const hasActive = data.items.some(i => i.status === 'pending' || i.status === 'processing');
+      if (hasActive) {
+        setTimeout(loadGallery, 3000);
       }
     } catch (err) {
       gallery.innerHTML = `<p class="subtitle" style="grid-column:1/-1; text-align:center; padding:2rem; color:var(--accent-danger)">

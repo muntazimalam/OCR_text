@@ -89,7 +89,10 @@ class ImageService:
         from sqlalchemy.orm import joinedload
         query = db.query(Image).options(joinedload(Image.analysis_result))
         if status_filter:
-            query = query.filter(Image.status == status_filter)
+            if status_filter == ImageStatus.PENDING:
+                query = query.filter(Image.status.in_([ImageStatus.PENDING, ImageStatus.PROCESSING]))
+            else:
+                query = query.filter(Image.status == status_filter)
         total = query.count()
         items = query.order_by(Image.created_at.desc()).offset(skip).limit(limit).all()
 

@@ -88,10 +88,11 @@ async function loadStats() {
       el.style.cssText = '';
       animateCount(el, val);
     };
-    set('statTotal',    d.total ?? '—');
-    set('statCompleted', d.completed ?? '—');
-    set('statFailed',   d.failed ?? '—');
-    set('statPending',  d.pending ?? '—');
+    const fv = (v, fb) => (v == null ? fb : v);
+    set('statTotal',    fv(d.total, '—'));
+    set('statCompleted', fv(d.completed, '—'));
+    set('statFailed',   fv(d.failed, '—'));
+    set('statPending',  fv(d.pending, '—'));
     set('statPassRate', d.total > 0 ? `${Math.round(d.pass_rate * 100)}%` : '—');
   } catch (e) {
     console.warn('Stats load failed:', e.message);
@@ -117,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadGallery();
 
   // Browse button
-  browseBtn?.addEventListener('click', () => fileInput.click());
+  if (browseBtn) browseBtn.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
 
   // ─── Drag & Drop ──────────────────────────────────────────────────────────
@@ -126,21 +127,31 @@ document.addEventListener('DOMContentLoaded', () => {
   dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
-    if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files.length) uploadFiles(Array.from(e.dataTransfer.files));
   });
 
   fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length) uploadFile(e.target.files[0]);
+    if (e.target.files.length) uploadFiles(Array.from(e.target.files));
   });
 
-  // ─── Filter Buttons ────────────────────────────────────────────────────────
-  filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      filterBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentFilter = btn.dataset.filter;
-      loadGallery();
+  // ─── Refresh Button ───────────────────────────────────────────────────────
+  const refreshBtn = document.getElementById('refreshBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      refreshBtn.classList.add('spinning');
+      Promise.all([loadGallery(), loadStats()]).finally(() => {
+        setTimeout(() => refreshBtn.classList.remove('spinning'), 600);
+      });
     });
+  }
+
+  // ─── Filter Buttons ────────────────────────────────────────────────────────
+  function setFilter(name) {
+    currentFilter = name;
+    filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === name));
+  }
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => setFilter(btn.dataset.filter));
   });
 
   // ─── Drop Zone Reset ───────────────────────────────────────────────────────
@@ -152,40 +163,61 @@ document.addEventListener('DOMContentLoaded', () => {
       <p class="subtitle">JPG · PNG · WEBP — 15MB</p>
       <button class="btn-upload" type="button" id="browseBtn">Browse Files</button>
     `;
-    document.getElementById('browseBtn')?.addEventListener('click', () => fileInput.click());
+    const bb = document.getElementById('browseBtn');
+    if (bb) bb.addEventListener('click', () => fileInput.click());
   }
 
-  // ─── Upload Logic ──────────────────────────────────────────────────────────
-  async function uploadFile(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    const target = dropZoneContent || dropZone;
-    target.innerHTML = `<span class="upload-icon">⏳</span><p><strong>Uploading &amp; queuing analysis...</strong></p>
-      <p class="subtitle">ENTERING SCAN QUEUE</p>`;
-
-    try {
-      const res = await fetch('/api/v1/images', { method: 'POST', body: formData });
-      const data = await parseResponse(res);
-      if (!res.ok) throw new Error(data.detail || 'Upload failed');
-
-      resetDropZone();
-      if (fileInput) fileInput.value = '';
-      showToast(`✔ "${file.name}" queued for analysis`, 'success');
-      loadGallery();
-      loadStats();
-      inspectImage(data.id);
-    } catch (err) {
-      console.error('Upload Error:', err);
-      target.innerHTML = `
-        <span class="upload-icon">⚠️</span>
-        <p><strong style="color:#ff4d5e">Upload Interrupted</strong></p>
-        <p class="subtitle">${err.message}</p>
-        <button class="btn-upload" type="button" id="browseBtn">Try Again</button>
-      `;
-      document.getElementById('browseBtn')?.addEventListener('click', () => fileInput.click());
-      if (fileInput) fileInput.value = '';
-      showToast(err.message, 'error');
+  // ─── Upload Logic (multi-file queue) ──────────────────────────────────────
+  async function uploadFiles(files) {
+    const list = Array.from(files).filter(f =>
+      /^image\/(jpeg|png|webp)$/.test((f.type || '').toLowerCase()) ||
+      /\.(jpe?g|png|webp)$/i.test(f.name || '')
+    );
+    if (!list.length) {
+      showToast('No valid image files selected (JPG · PNG · WEBP)', 'error');
+      return;
     }
+
+    setFilter('all');
+
+    const target = dropZoneContent || dropZone;
+    target.innerHTML = `
+      <span class="upload-icon">⏳</span>
+      <p><strong>Uploading ${list.length} file${list.length > 1 ? 's' : ''} &amp; queuing analysis...</strong></p>
+      <p class="subtitle">ENTERING SCAN QUEUE</p>
+      <div class="upload-progress">
+        <div class="progress-label">UPLOADING 0/${list.length}</div>
+        <div class="progress-track"><div class="progress-fill"></div></div>
+      </div>`;
+
+    const progLabel = (target.getElementsByClassName('progress-label'))[0];
+    const progFill = (target.getElementsByClassName('progress-fill'))[0];
+
+    let okCount = 0, done = 0, firstId = null;
+    for (const file of list) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch('/api/v1/images', { method: 'POST', body: formData });
+        const data = await parseResponse(res);
+        if (!res.ok) throw new Error(data.detail || 'Upload failed');
+        okCount++;
+        if (!firstId) firstId = data.id;
+        showToast(`✔ "${file.name}" queued for analysis`, 'success');
+      } catch (err) {
+        console.error('Upload Error:', err.message);
+        showToast(`"${file.name}": ${err.message}`, 'error');
+      }
+      done++;
+      if (progLabel) progLabel.textContent = `UPLOADING ${done}/${list.length} — ${okCount} OK`;
+      if (progFill) progFill.style.width = `${Math.round((done / list.length) * 100)}%`;
+    }
+
+    resetDropZone();
+    if (fileInput) fileInput.value = '';
+    loadGallery();
+    loadStats();
+    if (firstId) inspectImage(firstId);
   }
 
   // ─── Quick Sample Analysis ─────────────────────────────────────────────────
@@ -203,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok) throw new Error(`Sample not found: ${fileName}`);
       const blob = await response.blob();
       const file = new File([blob], fileName, { type: blob.type });
-      uploadFile(file);
+      uploadFiles([file]);
     } catch (err) {
       showToast(`Failed to load sample: ${err.message}`, 'error');
     }
@@ -258,6 +290,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const res_px = item.width && item.height ? `${item.width}×${item.height}` : '';
+
+        let plateLine = '';
+        if (item.status === 'completed' && item.plate_text) {
+          const mark = item.plate_valid === false ? '?' : '✓';
+          const cls = item.plate_valid === false ? 'p-no' : 'p-ok';
+          plateLine = `<div class="plate-line"><span class="${cls}">${mark} ${item.plate_text}</span></div>`;
+        } else if (item.status === 'completed') {
+          plateLine = `<div class="plate-line"><span class="p-no">NO PLATE DETECTED</span></div>`;
+        } else if (item.status === 'pending' || item.status === 'processing') {
+          plateLine = `<div class="plate-line"><span class="p-wait">SCANNING PLATE...</span></div>`;
+        }
+
         card.innerHTML = `
           <button class="delete-btn" title="Delete image" aria-label="Delete ${item.original_filename}">🗑 Delete</button>
           <div class="img-container">
@@ -271,6 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <span>${(item.file_size / 1024).toFixed(1)} KB ${res_px ? '· ' + res_px : ''}</span>
               <span>${new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
             </div>
+            ${plateLine}
           </div>`;
 
         card.querySelector('.delete-btn').addEventListener('click', (e) => deleteImage(item.id, item.original_filename, e));
@@ -359,11 +404,11 @@ document.addEventListener('DOMContentLoaded', () => {
       metricsContainer.innerHTML = `
         <div class="metric-item">
           <span>Clarity / Blur</span>
-          <strong>${blur.is_blurry ? '🔴 Blurry' : '🟢 Sharp'} (${blur.score ?? 0})</strong>
+          <strong>${blur.is_blurry ? '🔴 Blurry' : '🟢 Sharp'} (${blur.score == null ? 0 : blur.score})</strong>
         </div>
         <div class="metric-item">
           <span>Brightness / Lighting</span>
-          <strong style="text-transform:capitalize;">${bright.status || 'N/A'} (${bright.score ?? 0}${contrastTxt})</strong>
+          <strong style="text-transform:capitalize;">${bright.status || 'N/A'} (${bright.score == null ? 0 : bright.score}${contrastTxt})</strong>
         </div>
         <div class="metric-item">
           <span>License Plate</span>
@@ -394,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`;
       }
 
-      if (data.issues?.length > 0) {
+      if (data.issues && data.issues.length > 0) {
         data.issues.forEach(issue => {
           const cls = issue.severity === 'high' ? 'issue-high' : issue.severity === 'medium' ? 'issue-medium' : 'issue-low';
           issuesContainer.innerHTML += `<div class="issue-chip ${cls}">
@@ -404,7 +449,8 @@ document.addEventListener('DOMContentLoaded', () => {
         issuesContainer.innerHTML += `<div class="issue-chip issue-low">🟢 No quality or authenticity issues detected.</div>`;
       }
 
-      document.getElementById('reanalyzeBtn')?.addEventListener('click', async () => {
+      const reanalyzeBtn = document.getElementById('reanalyzeBtn');
+      if (reanalyzeBtn) reanalyzeBtn.addEventListener('click', async () => {
         try {
           showToast('Re-triggering analysis pipeline...', 'info');
           const r = await fetch(`/api/v1/images/${imageId}/reanalyze`, { method: 'POST' });

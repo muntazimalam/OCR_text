@@ -111,6 +111,8 @@ class ImageService:
                 "status": img.status,
                 "error_message": img.error_message,
                 "overall_score": img.analysis_result.overall_score if img.analysis_result else None,
+                "plate_text": img.analysis_result.plate_text if img.analysis_result else None,
+                "plate_valid": img.analysis_result.plate_valid if img.analysis_result else None,
                 "created_at": img.created_at,
                 "updated_at": img.updated_at
             }

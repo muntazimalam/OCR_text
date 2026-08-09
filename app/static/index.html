@@ -83,7 +83,7 @@
         </div>
 
         <form id="uploadForm" aria-label="Image upload form">
-          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display: none;" aria-label="Select image file">
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" multiple style="display: none;" aria-label="Select image files">
           <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Drag and drop zone">
             <div class="grid-help" aria-hidden="true">
               <span class="a"></span><span class="b"></span><span class="c"></span><span class="d"></span>
@@ -114,11 +114,19 @@
           <div class="card-title" style="margin:0;">
             <span class="tag" style="--c:#ffb42b;">PROCESSED GALLERY</span>
           </div>
-          <div class="filter-group" role="group" aria-label="Filter images by status">
-            <button class="filter-btn active" data-filter="all"        id="filterAll">All</button>
-            <button class="filter-btn"        data-filter="completed"  id="filterCompleted">Completed</button>
-            <button class="filter-btn"        data-filter="pending"    id="filterPending">Pending</button>
-            <button class="filter-btn"        data-filter="failed"     id="filterFailed">Failed</button>
+          <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+            <button class="btn-icon" id="refreshBtn" title="Refresh gallery & stats" aria-label="Refresh gallery and statistics">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
+              </svg>
+              Refresh
+            </button>
+            <div class="filter-group" role="group" aria-label="Filter images by status">
+              <button class="filter-btn active" data-filter="all"        id="filterAll">All</button>
+              <button class="filter-btn"        data-filter="completed"  id="filterCompleted">Completed</button>
+              <button class="filter-btn"        data-filter="pending"    id="filterPending">Pending</button>
+              <button class="filter-btn"        data-filter="failed"     id="filterFailed">Failed</button>
+            </div>
           </div>
         </div>
 

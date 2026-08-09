@@ -36,6 +36,8 @@ class ImageResponse(ImageBase):
     file_path: str
     status: ImageStatus
     overall_score: Optional[float] = None
+    plate_text: Optional[str] = None
+    plate_valid: Optional[bool] = None
     error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime

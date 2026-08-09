@@ -25,6 +25,15 @@ VEHICLE_BRAND_KEYWORDS = {
     "TVS", "KTM", "BAJAJ", "VESPA", "PIAGGIO", "MAHINDRA", "TATA", "EICHER"
 }
 
+# Words that commonly appear as brand/advertising text on yellow banner regions
+NOISE_WORDS = {
+    "IMD", "AGE", "RE", "RENA", "THE", "NEW", "ALL", "EVE", "OUT", "SUP",
+    "LIVE", "HARD", "SOFT", "MUSIC", "RACE", "SAFE", "DARE", "PACE", "LOGO"
+}
+
+# Prefixes that indicate GPS metadata or identifiers, not plates
+NOISE_PREFIXES = ("LAT", "LONG", "TASK", "IMEI", "HOSP", "TEL", "WWW", "HTTP")
+
 CHAR_SUB_TO_DIGIT = {"O": "0", "Q": "0", "I": "1", "L": "1", "Z": "2", "S": "5", "G": "6", "T": "7", "B": "8", "X": "0", "Y": "4", "U": "0", "V": "5", "K": "0", "M": "5", "F": "7", "C": "5", "W": "8", "H": "2"}
 CHAR_SUB_TO_ALPHA = {"0": "O", "1": "I", "2": "Z", "5": "S", "6": "G", "7": "T", "8": "B", "4": "A", "3": "B", "9": "P"}
 
@@ -36,20 +45,32 @@ def is_brand_noise(text: str) -> bool:
     return any(b in txt_up for b in VEHICLE_BRAND_KEYWORDS)
 
 
+def _char_mix_ok(cleaned: str) -> bool:
+    """Requires at least 2 letters and 2 digits — rejects pure text or pure digits."""
+    if not cleaned:
+        return False
+    has_alpha = sum(1 for c in cleaned if c.isalpha())
+    has_digit = sum(1 for c in cleaned if c.isdigit())
+    return has_alpha >= 2 and has_digit >= 2
+
+
 def normalize_indian_plate_candidate(token: str) -> List[str]:
     """
-    Normalizes OCR character confusion dynamically for any Indian license plate format.
-    E.g. TN05BT5754, MH12NW8556, KA05EX5678, KA01AB1234, DL1C1234
+    Normalizes OCR character confusion dynamically for Indian license plates.
+    E.g. KAO1AB1234 -> KA01AB1234, MHIZNH8556 -> MH12NH8556, TN05BT5754.
+    Only generates structured candidates for tokens that actually resemble
+    a plate (start with a known state code), preventing false plates from
+    street text / phone numbers (e.g. 7765900813).
     """
     candidates = [token]
 
     cleaned = re.sub(r"[^A-Z0-9]", "", token.upper())
-    if not cleaned or is_brand_noise(cleaned):
+    if not cleaned or is_brand_noise(cleaned) or not _char_mix_ok(cleaned):
         return candidates
 
-    # Candidate 1: Standard regex sliding window
-    m = re.search(r"([A-Z0-9]{2})([A-Z0-9]{1,2})([A-Z0-9]{1,3})([A-Z0-9]{3,4})", cleaned)
-    if m:
+    # Candidate 1: Anchored state-code sliding window
+    m = re.match(r"^([A-Z]{2})([A-Z0-9]{1,2})([A-Z0-9]{1,3})([A-Z0-9]{3,4})$", cleaned)
+    if m and m.group(1) in STATE_CODES:
         st, dist, ser, num = m.groups()
         st_clean = "".join(CHAR_SUB_TO_ALPHA.get(c, c) for c in st)
         dist_clean = "".join(CHAR_SUB_TO_DIGIT.get(c, c) for c in dist)
@@ -57,15 +78,15 @@ def normalize_indian_plate_candidate(token: str) -> List[str]:
         num_clean = "".join(CHAR_SUB_TO_DIGIT.get(c, c) for c in num)
 
         normalized = f"{st_clean}{dist_clean}{ser_clean}{num_clean}"
-        if normalized not in candidates:
+        if normalized != cleaned and re.fullmatch(r"[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{1,4}", normalized):
             candidates.append(normalized)
 
-    # Candidate 2: Positional character substitution ONLY for full 6+ char tokens
-    if len(cleaned) >= 6:
+    # Candidate 2: Positional character substitution (only for structured plates)
+    if len(cleaned) <= 11 and _char_mix_ok(cleaned):
         st_raw = cleaned[:2]
         st_clean = "".join(CHAR_SUB_TO_ALPHA.get(c, c) for c in st_raw)
 
-        if st_clean in STATE_CODES or len(cleaned) >= 8:
+        if st_clean in STATE_CODES and cleaned[:2].isalpha():
             dist_raw = cleaned[2:4]
             dist_clean = "".join(CHAR_SUB_TO_DIGIT.get(c, c) for c in dist_raw)
 
@@ -76,7 +97,7 @@ def normalize_indian_plate_candidate(token: str) -> List[str]:
             num_clean = "".join(CHAR_SUB_TO_DIGIT.get(c, c) for c in num_raw)
 
             norm_pos = f"{st_clean}{dist_clean}{ser_clean}{num_clean}"
-            if norm_pos not in candidates:
+            if norm_pos != cleaned and re.fullmatch(r"[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{1,4}", norm_pos):
                 candidates.append(norm_pos)
 
     return candidates
@@ -86,6 +107,8 @@ class NumberPlateAnalyzer(BaseAnalyzer):
     """
     Universal License Plate Analyzer supporting Cars, Motorcycles/Bikes, Auto Rickshaws,
     Trucks, & Commercial Vehicles across Indian, US, EU, and Universal Alphanumeric formats.
+
+    Verification is strict: a plate is only flagged `valid` on a full-format match.
     """
     def analyze(self, image_path: str, file_bytes: bytes, ocr_result: Dict[str, Any] = None) -> Dict[str, Any]:
         if not ocr_result or not ocr_result.get("text"):
@@ -147,39 +170,36 @@ class NumberPlateAnalyzer(BaseAnalyzer):
         best_format = None
         is_valid = False
 
-        # Phase 1: Test against Specific Regional & Standard Patterns
-        for candidate in unique_candidates:
-            if is_brand_noise(candidate):
-                continue
-            for pattern, base_conf, fmt_name in SPECIFIC_PLATE_PATTERNS:
-                if pattern.match(candidate):
+        # Phase 1: Strict full-format verification (longest complete match wins)
+        for pattern, base_conf, fmt_name in SPECIFIC_PLATE_PATTERNS:
+            for candidate in unique_candidates:
+                if len(candidate) > 14:
+                    continue
+                if is_brand_noise(candidate):
+                    continue
+                if not pattern.fullmatch(candidate):
+                    continue
+                if best_plate is None or len(candidate) > len(best_plate):
                     best_plate = candidate
                     best_conf = base_conf
                     best_format = fmt_name
                     is_valid = True
-                    break
-                match = pattern.search(candidate)
-                if match:
-                    best_plate = match.group(0)
-                    best_conf = base_conf * 0.95
-                    best_format = fmt_name
-                    is_valid = True
-                    break
-            if is_valid:
-                break
 
-        # Phase 2: Universal Fallback Heuristic
+        # Phase 2: Universal structural fallback (mixed alnum, reasonable length)
         if not is_valid:
             for candidate in unique_candidates:
-                if 5 <= len(candidate) <= 12 and not is_brand_noise(candidate):
-                    has_alpha = any(c.isalpha() for c in candidate)
-                    has_digit = any(c.isdigit() for c in candidate)
-                    if has_alpha and has_digit:
+                if not 6 <= len(candidate) <= 12 or is_brand_noise(candidate):
+                    continue
+                if candidate in NOISE_WORDS or candidate.startswith(NOISE_PREFIXES):
+                    continue
+                has_alpha = sum(1 for c in candidate if c.isalpha())
+                has_digit = sum(1 for c in candidate if c.isdigit())
+                if has_alpha >= 2 and has_digit >= 3:
+                    if best_plate is None or len(candidate) > len(best_plate):
                         best_plate = candidate
                         best_conf = 0.85
                         best_format = "Universal Vehicle Plate"
                         is_valid = True
-                        break
 
         return {
             "detected": best_plate is not None,

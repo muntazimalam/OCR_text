@@ -43,6 +43,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  let inspectPollTimer = null;
+
+  function stopModalPolling() {
+    if (inspectPollTimer) {
+      clearTimeout(inspectPollTimer);
+      inspectPollTimer = null;
+    }
+  }
+
+  async function parseResponse(res) {
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return await res.json();
+    }
+    const text = await res.text();
+    throw new Error(`Server returned HTTP ${res.status}: ${res.statusText || text.substring(0, 100)}`);
+  }
+
   function resetDropZone() {
     const target = dropZoneContent || dropZone;
     target.innerHTML = `
@@ -65,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'POST',
         body: formData
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (!res.ok) throw new Error(data.detail || 'Upload failed');
 
       resetDropZone();
@@ -108,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         url += `&status=${currentFilter}`;
       }
       const res = await fetch(url);
-      const data = await res.json();
+      const data = await parseResponse(res);
 
       gallery.innerHTML = '';
       if (!data.items || data.items.length === 0) {
@@ -125,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (item.status === 'completed') {
           const resResult = await fetch(`/api/v1/images/${item.id}/results`);
           if (resResult.ok) {
-            const resData = await resResult.json();
+            const resData = await parseResponse(resResult);
             const score = resData.overall_score !== null ? Math.round(resData.overall_score * 100) : 100;
             const scoreClass = score >= 80 ? 'score-high' : (score >= 50 ? 'score-medium' : 'score-low');
             scoreTag = `<span class="score-badge ${scoreClass}">Score: ${score}%</span>`;
@@ -155,10 +173,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Inspect Image Detail Modal
   async function inspectImage(imageId) {
+    stopModalPolling();
     try {
       const res = await fetch(`/api/v1/images/${imageId}/results`);
       if (!res.ok) throw new Error('Result not found');
-      const data = await res.json();
+      const data = await parseResponse(res);
 
       document.getElementById('modalImage').src = `/api/v1/images/${imageId}/file`;
       document.getElementById('modalTitle').textContent = `Inspection Report — ${imageId.substring(0, 8)}`;
@@ -171,8 +190,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.status === 'pending' || data.status === 'processing') {
         scoreDisplay.textContent = '⏳';
         metricsContainer.innerHTML = '<p class="subtitle" style="padding: 1rem; text-align: center;">Media pipeline is currently analyzing this image...</p>';
-        issuesContainer.innerHTML = '<div class="issue-chip issue-medium">⏳ Image analysis in progress. Please check back in a few seconds.</div>';
+        issuesContainer.innerHTML = '<div class="issue-chip issue-medium">⏳ Image analysis in progress. Automatically updating when ready...</div>';
         modal.classList.add('active');
+
+        // Poll every 2 seconds for status update
+        inspectPollTimer = setTimeout(() => {
+          inspectImage(imageId);
+          loadGallery();
+        }, 2000);
         return;
       }
 
@@ -241,9 +266,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  closeModalBtn.addEventListener('click', () => modal.classList.remove('active'));
+  closeModalBtn.addEventListener('click', () => {
+    stopModalPolling();
+    modal.classList.remove('active');
+  });
   modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.classList.remove('active');
+    if (e.target === modal) {
+      stopModalPolling();
+      modal.classList.remove('active');
+    }
   });
 
   loadGallery();

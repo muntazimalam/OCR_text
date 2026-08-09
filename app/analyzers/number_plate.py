@@ -172,19 +172,17 @@ class NumberPlateAnalyzer(BaseAnalyzer):
         best_format = None
         is_valid = False
 
-        # Phase 1: Full-format pattern match
+        # Phase 1: Full-format pattern match (longest valid match wins)
         for pattern, base_conf, fmt_name in SPECIFIC_PLATE_PATTERNS:
             for candidate in unique_candidates:
-                if len(candidate) > 14 or is_brand_noise(candidate):
+                if not (5 <= len(candidate) <= 14) or is_brand_noise(candidate):
                     continue
                 if pattern.fullmatch(candidate):
-                    best_plate = candidate
-                    best_conf = base_conf
-                    best_format = fmt_name
-                    is_valid = True
-                    break
-            if is_valid:
-                break
+                    if best_plate is None or len(candidate) > len(best_plate):
+                        best_plate = candidate
+                        best_conf = base_conf
+                        best_format = fmt_name
+                        is_valid = True
 
         # Phase 2: Universal structural fallback for non-Indian or non-standard vehicle plates
         if not is_valid:

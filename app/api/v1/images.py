@@ -141,7 +141,7 @@ def reanalyze_image(
             detail=f"Image with ID '{image_id}' not found"
         )
     ImageService.update_image_status(db, image_id, ImageStatus.PENDING, error_message=None)
-    background_tasks.add_task(run_image_processing_standalone, str(image_id))
+    background_tasks.add_task(run_image_processing_standalone, str(image_id), force=True)
     return {"status": "reanalyzing", "image_id": str(image_id)}
 
 

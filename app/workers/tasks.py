@@ -8,10 +8,10 @@ from app.services.analysis_service import AnalysisService
 from app.core.logging import logger
 
 
-def run_image_processing_standalone(image_id_str: str) -> dict:
+def run_image_processing_standalone(image_id_str: str, force: bool = False) -> dict:
     """
     Runs the full analysis pipeline for a single image.
-    Fails immediately on any error — no retries, no second chances.
+    When force=True (e.g. on re-analysis), forces a fresh run even if previously completed or failed.
     """
     image_id = UUID(image_id_str)
     db = SessionLocal()
@@ -22,11 +22,11 @@ def run_image_processing_standalone(image_id_str: str) -> dict:
             logger.error("image_not_found_for_processing", image_id=image_id_str)
             return {"status": "failed", "error": "Image not found"}
 
-        if image.status == ImageStatus.COMPLETED:
+        if not force and image.status == ImageStatus.COMPLETED:
             logger.info("image_already_processed", image_id=image_id_str)
             return {"status": "completed", "image_id": image_id_str}
 
-        if image.status == ImageStatus.FAILED:
+        if not force and image.status == ImageStatus.FAILED:
             logger.info("image_already_failed", image_id=image_id_str)
             return {"status": "failed", "image_id": image_id_str, "error": image.error_message}
 

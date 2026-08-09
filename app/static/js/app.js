@@ -163,8 +163,25 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('modalImage').src = `/api/v1/images/${imageId}/file`;
       document.getElementById('modalTitle').textContent = `Inspection Report — ${imageId.substring(0, 8)}`;
       
-      const overallPct = data.overall_score !== null ? Math.round(data.overall_score * 100) : 100;
-      document.getElementById('scoreDisplay').textContent = `${overallPct}%`;
+      const scoreDisplay = document.getElementById('scoreDisplay');
+      const metricsContainer = document.getElementById('metricsContainer');
+      const issuesContainer = document.getElementById('issuesContainer');
+      issuesContainer.innerHTML = '';
+
+      if (data.status === 'pending' || data.status === 'processing') {
+        scoreDisplay.textContent = '⏳';
+        metricsContainer.innerHTML = '<p class="subtitle" style="padding: 1rem; text-align: center;">Media pipeline is currently analyzing this image...</p>';
+        issuesContainer.innerHTML = '<div class="issue-chip issue-medium">⏳ Image analysis in progress. Please check back in a few seconds.</div>';
+        modal.classList.add('active');
+        return;
+      }
+
+      if (data.status === 'failed') {
+        scoreDisplay.textContent = '❌';
+      } else {
+        const overallPct = data.overall_score !== null ? Math.round(data.overall_score * 100) : 0;
+        scoreDisplay.textContent = `${overallPct}%`;
+      }
 
       const analysis = data.analysis || {};
       const blurInfo = analysis.blur || {};
@@ -174,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const metaInfo = analysis.metadata || {};
       const tamperingInfo = analysis.tampering || {};
 
-      document.getElementById('metricsContainer').innerHTML = `
+      metricsContainer.innerHTML = `
         <div class="metric-item">
           <span>Clarity / Blur</span>
           <strong>${blurInfo.is_blurry ? '🔴 Blurry' : '🟢 Sharp'} (Score: ${blurInfo.score || 0})</strong>
@@ -201,11 +218,11 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
 
-      const issuesContainer = document.getElementById('issuesContainer');
-      issuesContainer.innerHTML = '';
-      if (!data.issues || data.issues.length === 0) {
-        issuesContainer.innerHTML = '<div class="issue-chip issue-low">🟢 No quality or authenticity issues detected.</div>';
-      } else {
+      if (data.status === 'failed') {
+        issuesContainer.innerHTML = `<div class="issue-chip issue-high">🔴 <strong>Processing Failed</strong>: ${data.error_message || 'Image failed validation checks or license plate detection.'}</div>`;
+      }
+
+      if (data.issues && data.issues.length > 0) {
         data.issues.forEach(issue => {
           const issueClass = issue.severity === 'high' ? 'issue-high' : (issue.severity === 'medium' ? 'issue-medium' : 'issue-low');
           issuesContainer.innerHTML += `
@@ -214,6 +231,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           `;
         });
+      } else if (data.status === 'completed') {
+        issuesContainer.innerHTML = '<div class="issue-chip issue-low">🟢 No quality or authenticity issues detected.</div>';
       }
 
       modal.classList.add('active');

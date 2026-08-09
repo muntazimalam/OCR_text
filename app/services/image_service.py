@@ -55,15 +55,18 @@ class ImageService:
     @staticmethod
     def save_analysis_result(db: Session, analysis_data: dict) -> AnalysisResult:
         image_id = analysis_data["image_id"]
+        valid_keys = {c.name for c in AnalysisResult.__table__.columns}
+        filtered_data = {k: v for k, v in analysis_data.items() if k in valid_keys}
+
         existing = db.query(AnalysisResult).filter(AnalysisResult.image_id == image_id).first()
         if existing:
-            for key, value in analysis_data.items():
+            for key, value in filtered_data.items():
                 setattr(existing, key, value)
             db.commit()
             db.refresh(existing)
             return existing
 
-        analysis = AnalysisResult(**analysis_data)
+        analysis = AnalysisResult(**filtered_data)
         db.add(analysis)
         db.commit()
         db.refresh(analysis)

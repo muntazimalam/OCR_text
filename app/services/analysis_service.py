@@ -11,6 +11,7 @@ from app.analyzers.metadata import MetadataAnalyzer
 from app.analyzers.tampering import TamperingAnalyzer
 from app.analyzers.photo_of_photo import PhotoOfPhotoAnalyzer
 from app.services.image_service import ImageService
+from app.utils.file_utils import load_image_auto_orient
 from app.core.logging import logger
 
 
@@ -29,9 +30,13 @@ class AnalysisService:
         self, db: Session, image_id: UUID, file_path: str, sha256_hash: str
     ) -> Dict[str, Any]:
         with open(file_path, "rb") as f:
-            file_bytes = f.read()
+            raw_bytes = f.read()
+
+        # Apply EXIF auto-orientation for mobile phone uploads
+        file_bytes, _, _, _ = load_image_auto_orient(raw_bytes)
 
         issues: List[Dict[str, Any]] = []
+        failure_reasons: List[str] = []
 
         # 1. Blur
         try:
@@ -147,6 +152,17 @@ class AnalysisService:
             blur_res, brightness_res, duplicate_res, plate_res, tampering_res, pop_res
         )
 
+        # Failure Condition Checks
+        if not plate_res.get("valid"):
+            failure_reasons.append("No valid license plate detected")
+        if blur_res.get("is_blurry"):
+            failure_reasons.append("Image is blurry")
+        if brightness_res.get("status") in {"very_dark", "overexposed"}:
+            failure_reasons.append("Suboptimal lighting")
+
+        is_failed = len(failure_reasons) > 0
+        error_msg = f"Validation Failed: {', '.join(failure_reasons)}" if is_failed else None
+
         return {
             "image_id": image_id,
             "blur_score": blur_res.get("score"),
@@ -164,6 +180,8 @@ class AnalysisService:
             "metadata_info": metadata_res,
             "overall_score": overall_score,
             "issues": issues,
+            "is_failed": is_failed,
+            "error_message": error_msg,
         }
 
     def _calculate_overall_score(

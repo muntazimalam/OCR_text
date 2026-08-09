@@ -31,10 +31,16 @@ def process_image(self, image_id_str: str):
         )
 
         ImageService.save_analysis_result(db, analysis_data)
-        ImageService.update_image_status(db, image_id, ImageStatus.COMPLETED)
-
-        logger.info("processing_completed", image_id=image_id_str)
-        return {"status": "completed", "image_id": image_id_str}
+        
+        if analysis_data.get("is_failed"):
+            err_msg = analysis_data.get("error_message") or "Validation checks failed"
+            ImageService.update_image_status(db, image_id, ImageStatus.FAILED, error_message=err_msg)
+            logger.info("processing_completed_with_validation_failure", image_id=image_id_str, error=err_msg)
+            return {"status": "failed", "image_id": image_id_str, "error": err_msg}
+        else:
+            ImageService.update_image_status(db, image_id, ImageStatus.COMPLETED)
+            logger.info("processing_completed", image_id=image_id_str)
+            return {"status": "completed", "image_id": image_id_str}
 
     except Exception as exc:
         logger.error("processing_failed", image_id=image_id_str, error=str(exc))

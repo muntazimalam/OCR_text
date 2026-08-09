@@ -388,17 +388,19 @@ document.addEventListener('DOMContentLoaded', () => {
         ? ` · Contrast: ${Math.round(bright.contrast_score)}` : '';
 
       // Prominent License Plate text formatting
-      const recognizedPlateText = plate.plate_text || ocr.text || null;
+      const recognizedPlateText = plate.plate_text || (ocr.text ? ocr.text.trim() : null);
       const plateBadgeHtml = recognizedPlateText
-        ? `<span class="plate-badge-highlight">${recognizedPlateText}</span>`
+        ? `<span class="plate-badge-highlight" style="display:inline-block; padding:2px 8px; border-radius:4px; background:#1e293b; color:#38bdf8; font-weight:700; font-family:monospace; letter-spacing:1px; border:1px solid #0284c7;">${recognizedPlateText}</span>`
         : '';
 
+      const formatLabel = plate.format_type ? ` · <span style="font-size:0.75rem; opacity:0.8;">${plate.format_type}</span>` : '';
+
       const plateStatusHtml = plate.valid
-        ? `🟢 Valid ${plateBadgeHtml} (${plate.confidence ? Math.round(plate.confidence * 100) + '%' : '90%'})`
-        : '🔴 Not Detected';
+        ? `🟢 Valid ${plateBadgeHtml}${formatLabel} (${plate.confidence ? Math.round(plate.confidence * 100) + '%' : '90%'})`
+        : (plate.detected ? `🟡 Detected ${plateBadgeHtml}${formatLabel}` : '🔴 Not Detected');
 
       const ocrSceneTextDisplay = recognizedPlateText
-        ? `${plateBadgeHtml} ${ocr.text && ocr.text !== recognizedPlateText ? `<span style="font-size:0.72rem; color:var(--text-muted);">(raw: ${ocr.text})</span>` : ''}`
+        ? `${plateBadgeHtml} ${ocr.text && ocr.text !== recognizedPlateText ? `<span style="font-size:0.75rem; color:var(--text-muted);">(raw: ${ocr.text})</span>` : ''}`
         : (ocr.text || 'None detected');
 
       metricsContainer.innerHTML = `

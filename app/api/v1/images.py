@@ -14,6 +14,7 @@ from app.services.storage_service import StorageService
 from app.utils.file_utils import calculate_sha256
 from app.utils.validators import validate_uploaded_file
 from app.workers.tasks import process_image, run_image_processing_standalone
+from app.core.config import settings
 from app.core.logging import logger
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -111,7 +112,7 @@ def get_image_results(image_id: uuid.UUID, db: Session = Depends(get_db)):
             brightness={"score": analysis.brightness_score, "status": analysis.brightness_status} if analysis.brightness_score is not None else None,
             duplicate={"is_duplicate": analysis.is_duplicate, "duplicate_of": analysis.duplicate_of},
             ocr={"text": analysis.ocr_text, "confidence": ocr_conf},
-            number_plate={"detected": analysis.plate_detected, "valid": analysis.plate_valid, "confidence": analysis.plate_confidence, "plate_text": analysis.plate_text},
+            number_plate={"detected": analysis.plate_detected, "valid": analysis.plate_valid, "confidence": analysis.plate_confidence, "plate_text": analysis.plate_text, "format_type": getattr(analysis, "plate_format", None)},
             metadata=analysis.metadata_info,
             tampering={"suspicious_editing": tampering_data.get("suspicious_editing", False), "confidence": tampering_data.get("confidence", 0.0)}
         )

@@ -38,6 +38,7 @@ class NumberPlateAnalysis(BaseModel):
     valid: bool
     confidence: Optional[float] = None
     plate_text: Optional[str] = None
+    format_type: Optional[str] = None
 
 
 class MetadataAnalysis(BaseModel):

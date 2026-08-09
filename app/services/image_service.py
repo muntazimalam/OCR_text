@@ -46,8 +46,7 @@ class ImageService:
         image = db.query(Image).filter(Image.id == image_id).first()
         if image:
             image.status = status
-            if error_message:
-                image.error_message = error_message
+            image.error_message = error_message
             db.commit()
             db.refresh(image)
         return image

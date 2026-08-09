@@ -259,12 +259,13 @@ def _run_easyocr(
                 if len(cleaned_str) < min_chars:
                     continue
                 det = {"text": cleaned_str, "confidence": float(conf)}
-                if with_boxes and quad is not None:
-                    xs = [pt[0] for pt in quad]
-                    ys = [pt[1] for pt in quad]
-                    x0, y0 = float(min(xs)), float(min(ys))
-                    x1, y1 = float(max(xs)), float(max(ys))
-                    det["box"] = (int(x0), int(y0), int(x1 - x0), int(y1 - y0))
+                if with_boxes and quad is not None and len(quad) > 0:
+                    xs = [pt[0] for pt in quad if len(pt) >= 2]
+                    ys = [pt[1] for pt in quad if len(pt) >= 2]
+                    if xs and ys:
+                        x0, y0 = float(min(xs)), float(min(ys))
+                        x1, y1 = float(max(xs)), float(max(ys))
+                        det["box"] = (int(x0), int(y0), int(max(x1 - x0, 1)), int(max(y1 - y0, 1)))
                 detections.append(det)
         if detections:
             confs = [d["confidence"] for d in detections]

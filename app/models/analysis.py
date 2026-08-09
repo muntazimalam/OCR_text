@@ -27,6 +27,7 @@ class AnalysisResult(Base):
     plate_valid = Column(Boolean, default=False)
     plate_confidence = Column(Float, nullable=True)
     plate_text = Column(String, nullable=True)
+    plate_format = Column(String, nullable=True)
     
     tampering_info = Column(JSON, nullable=True)
     metadata_info = Column(JSON, nullable=True)

@@ -13,7 +13,7 @@ from app.services.image_service import ImageService
 from app.services.storage_service import StorageService
 from app.utils.file_utils import calculate_sha256
 from app.utils.validators import validate_uploaded_file
-from app.workers.tasks import process_image
+from app.workers.tasks import process_image, run_image_processing_standalone
 from app.core.logging import logger
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -51,7 +51,7 @@ async def upload_image(
         process_image.delay(str(image_id))
     except Exception as e:
         logger.warning("celery_dispatch_failed_fallback_async", image_id=str(image_id), error=str(e))
-        background_tasks.add_task(process_image.run, str(image_id))
+        background_tasks.add_task(run_image_processing_standalone, str(image_id))
     
     return image_record
 

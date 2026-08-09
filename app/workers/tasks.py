@@ -7,8 +7,7 @@ from app.services.analysis_service import AnalysisService
 from app.core.logging import logger
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=10)
-def process_image(self, image_id_str: str):
+def run_image_processing_standalone(image_id_str: str) -> dict:
     image_id = UUID(image_id_str)
     db = SessionLocal()
 
@@ -45,17 +44,24 @@ def process_image(self, image_id_str: str):
     except Exception as exc:
         logger.error("processing_failed", image_id=image_id_str, error=str(exc))
         db.rollback()
-
-        if self.request.retries < self.max_retries:
-            ImageService.update_image_status(
-                db, image_id, ImageStatus.PENDING, error_message=f"Retrying... ({str(exc)})"
-            )
-            db.close()
-            raise self.retry(exc=exc)
-        else:
-            ImageService.update_image_status(
-                db, image_id, ImageStatus.FAILED, error_message=f"Processing failed after max retries: {str(exc)}"
-            )
-            return {"status": "failed", "error": str(exc)}
+        ImageService.update_image_status(
+            db, image_id, ImageStatus.FAILED, error_message=f"Processing failed: {str(exc)}"
+        )
+        return {"status": "failed", "error": str(exc)}
     finally:
         db.close()
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=10)
+def process_image(self, image_id_str: str):
+    try:
+        res = run_image_processing_standalone(image_id_str)
+        if res.get("status") == "failed" and "Validation checks failed" not in res.get("error", ""):
+            if hasattr(self, "request") and self.request and self.request.retries < self.max_retries:
+                raise self.retry(exc=Exception(res.get("error")))
+        return res
+    except Exception as exc:
+        if hasattr(self, "request") and self.request and hasattr(self, "retry"):
+            if self.request.retries < self.max_retries:
+                raise self.retry(exc=exc)
+        raise exc

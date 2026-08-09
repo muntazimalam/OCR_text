@@ -11,15 +11,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
+    tesseract-ocr \
+    tesseract-ocr-eng \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Pre-download EasyOCR model weights during build to prevent runtime network delays on cloud hosts
-RUN python -c "import easyocr; easyocr.Reader(['en'], download_enabled=True, gpu=False)"
 
 COPY . .
 

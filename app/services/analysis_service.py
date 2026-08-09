@@ -1,3 +1,4 @@
+import gc
 from typing import Any, Dict, List
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -34,6 +35,9 @@ class AnalysisService:
 
         # Apply EXIF auto-orientation for mobile phone uploads
         file_bytes, _, _, _ = load_image_auto_orient(raw_bytes)
+        # Free raw_bytes immediately
+        del raw_bytes
+        gc.collect()
 
         issues: List[Dict[str, Any]] = []
         failure_reasons: List[str] = []
@@ -51,6 +55,7 @@ class AnalysisService:
         except Exception as e:
             logger.error("blur_analyzer_error", error=str(e))
             blur_res = {"score": 0.0, "is_blurry": None, "error": str(e)}
+        gc.collect()
 
         # 2. Brightness
         try:
@@ -66,6 +71,7 @@ class AnalysisService:
         except Exception as e:
             logger.error("brightness_analyzer_error", error=str(e))
             brightness_res = {"score": 0.0, "status": "error", "error": str(e)}
+        gc.collect()
 
         # 3. Duplicate
         try:
@@ -90,6 +96,7 @@ class AnalysisService:
         except Exception as e:
             logger.error("ocr_analyzer_error", error=str(e))
             ocr_res = {"text": None, "confidence": None, "error": str(e)}
+        gc.collect()
 
         # 5. Number Plate
         try:
@@ -146,6 +153,10 @@ class AnalysisService:
         except Exception as e:
             logger.error("photo_of_photo_analyzer_error", error=str(e))
             pop_res = {"is_photo_of_photo": False, "confidence": 0.0, "error": str(e)}
+
+        # Free file_bytes before score calculation
+        del file_bytes
+        gc.collect()
 
         # Overall Score Calculation
         overall_score = self._calculate_overall_score(

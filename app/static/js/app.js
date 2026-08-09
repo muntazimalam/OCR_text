@@ -227,9 +227,11 @@ document.addEventListener('DOMContentLoaded', () => {
           const cls = score >= 80 ? 'score-high' : score >= 50 ? 'score-medium' : 'score-low';
           scoreTag = `<span class="score-badge ${cls}">Score: ${score}%</span>`;
         } else if (item.status === 'failed') {
-          scoreTag = `<span class="score-badge score-low">Failed</span>`;
-        } else if (item.status === 'pending' || item.status === 'processing') {
-          scoreTag = `<span class="score-badge score-medium">⏳ Processing...</span>`;
+          scoreTag = `<span class="score-badge score-low">❌ Failed</span>`;
+        } else if (item.status === 'processing') {
+          scoreTag = `<span class="score-badge score-medium">⚙️ Analyzing...</span>`;
+        } else if (item.status === 'pending') {
+          scoreTag = `<span class="score-badge score-medium">⏳ Pending</span>`;
         }
 
         const res_px = item.width && item.height ? `${item.width}×${item.height}` : '';

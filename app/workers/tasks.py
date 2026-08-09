@@ -1,3 +1,4 @@
+import gc
 from uuid import UUID
 from app.workers.celery_app import celery_app
 from app.core.database import SessionLocal
@@ -8,6 +9,10 @@ from app.core.logging import logger
 
 
 def run_image_processing_standalone(image_id_str: str) -> dict:
+    """
+    Runs the full analysis pipeline for a single image.
+    Fails immediately on any error — no retries, no second chances.
+    """
     image_id = UUID(image_id_str)
     db = SessionLocal()
 
@@ -21,6 +26,10 @@ def run_image_processing_standalone(image_id_str: str) -> dict:
             logger.info("image_already_processed", image_id=image_id_str)
             return {"status": "completed", "image_id": image_id_str}
 
+        if image.status == ImageStatus.FAILED:
+            logger.info("image_already_failed", image_id=image_id_str)
+            return {"status": "failed", "image_id": image_id_str, "error": image.error_message}
+
         ImageService.update_image_status(db, image_id, ImageStatus.PROCESSING)
         logger.info("processing_started", image_id=image_id_str)
 
@@ -30,11 +39,11 @@ def run_image_processing_standalone(image_id_str: str) -> dict:
         )
 
         ImageService.save_analysis_result(db, analysis_data)
-        
+
         if analysis_data.get("is_failed"):
             err_msg = analysis_data.get("error_message") or "Validation checks failed"
             ImageService.update_image_status(db, image_id, ImageStatus.FAILED, error_message=err_msg)
-            logger.info("processing_completed_with_validation_failure", image_id=image_id_str, error=err_msg)
+            logger.info("processing_failed_validation", image_id=image_id_str, error=err_msg)
             return {"status": "failed", "image_id": image_id_str, "error": err_msg}
         else:
             ImageService.update_image_status(db, image_id, ImageStatus.COMPLETED)
@@ -42,26 +51,24 @@ def run_image_processing_standalone(image_id_str: str) -> dict:
             return {"status": "completed", "image_id": image_id_str}
 
     except Exception as exc:
-        logger.error("processing_failed", image_id=image_id_str, error=str(exc))
-        db.rollback()
-        ImageService.update_image_status(
-            db, image_id, ImageStatus.FAILED, error_message=f"Processing failed: {str(exc)}"
-        )
+        # Fail immediately — mark as FAILED, no retry
+        logger.error("processing_crashed", image_id=image_id_str, error=str(exc))
+        try:
+            db.rollback()
+            ImageService.update_image_status(
+                db, image_id, ImageStatus.FAILED, error_message=f"Processing error: {str(exc)}"
+            )
+        except Exception:
+            pass
         return {"status": "failed", "error": str(exc)}
     finally:
         db.close()
+        gc.collect()
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=10)
+@celery_app.task(bind=True, max_retries=0)
 def process_image(self, image_id_str: str):
-    try:
-        res = run_image_processing_standalone(image_id_str)
-        if res.get("status") == "failed" and "Validation checks failed" not in res.get("error", ""):
-            if hasattr(self, "request") and self.request and self.request.retries < self.max_retries:
-                raise self.retry(exc=Exception(res.get("error")))
-        return res
-    except Exception as exc:
-        if hasattr(self, "request") and self.request and hasattr(self, "retry"):
-            if self.request.retries < self.max_retries:
-                raise self.retry(exc=exc)
-        raise exc
+    """
+    Celery task wrapper. max_retries=0 means fail immediately on first error.
+    """
+    return run_image_processing_standalone(image_id_str)

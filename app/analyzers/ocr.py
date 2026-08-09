@@ -20,10 +20,37 @@ _YELLOW_HSV_HI = (62, 255, 255)
 _MAX_CROP_OCR_CALLS = 8
 
 
+def _easyocr_allowed() -> bool:
+    """Decides whether EasyOCR (torch) may be loaded.
+
+    OCR_ENGINE env: 'tesseract' (lightweight, forced), 'easyocr' (forced),
+    or 'auto' (default) — auto requires at least ~1.2 GB free memory,
+    since torch crashes on small instances (e.g. Render free tier).
+    """
+    engine = os.getenv("OCR_ENGINE", "auto").strip().lower()
+    if engine == "tesseract":
+        return False
+    if engine == "easyocr":
+        return True
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) > 1_200_000
+    except Exception:
+        pass
+    try:
+        return os.sysconf("SC_AVAILABLE_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") > 1.2e9
+    except Exception:
+        return True
+
+
 def _get_easyocr_reader():
     global _easyocr_reader
     if _easyocr_reader is not None:
         return _easyocr_reader
+    if not _easyocr_allowed():
+        return None
     try:
         import easyocr
         _easyocr_reader = easyocr.Reader(['en'], gpu=False)

@@ -1,7 +1,7 @@
 import os
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -20,7 +20,11 @@ router = APIRouter(prefix="/images", tags=["images"])
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ImageStatusResponse, summary="Upload image for processing")
-async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_image(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
     file_bytes = await file.read()
     
     content_type, width, height = validate_uploaded_file(file, file_bytes)
@@ -46,9 +50,8 @@ async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_d
     try:
         process_image.delay(str(image_id))
     except Exception as e:
-        logger.warning("celery_dispatch_failed_fallback_sync", image_id=str(image_id), error=str(e))
-        process_image.run(str(image_id))
-        db.refresh(image_record)
+        logger.warning("celery_dispatch_failed_fallback_async", image_id=str(image_id), error=str(e))
+        background_tasks.add_task(process_image.run, str(image_id))
     
     return image_record
 

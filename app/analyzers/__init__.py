@@ -6,6 +6,7 @@ from app.analyzers.ocr import OCRAnalyzer
 from app.analyzers.number_plate import NumberPlateAnalyzer
 from app.analyzers.metadata import MetadataAnalyzer
 from app.analyzers.tampering import TamperingAnalyzer
+from app.analyzers.photo_of_photo import PhotoOfPhotoAnalyzer
 
 __all__ = [
     "BaseAnalyzer",
@@ -16,4 +17,5 @@ __all__ = [
     "NumberPlateAnalyzer",
     "MetadataAnalyzer",
     "TamperingAnalyzer",
+    "PhotoOfPhotoAnalyzer",
 ]

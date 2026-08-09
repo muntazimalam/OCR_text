@@ -1,6 +1,11 @@
 import os
+import sys
 import shutil
 import uuid
+
+# Ensure repository root is in sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from app.core.database import SessionLocal, Base, engine
 from app.models.image import Image, ImageStatus
 from app.services.image_service import ImageService

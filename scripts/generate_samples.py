@@ -1,9 +1,14 @@
 import os
+import sys
 import cv2
 import numpy as np
 from PIL import Image as PILImage
 
-SAMPLES_DIR = os.path.join("uploads", "samples")
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+SAMPLES_DIR = os.path.join(REPO_ROOT, "uploads", "samples")
 
 
 def create_sample_images():

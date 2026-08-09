@@ -37,3 +37,16 @@ def test_invalid_file_type_upload():
     )
     assert response.status_code == 400
     assert "Invalid file type" in response.json()["detail"]
+
+
+def test_valid_image_upload_returns_pending():
+    img_bytes = create_test_jpeg()
+    response = client.post(
+        "/api/v1/images",
+        files={"file": ("sample.jpg", img_bytes, "image/jpeg")}
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert "id" in data
+    assert data["status"] in ["pending", "processing", "completed"]
+

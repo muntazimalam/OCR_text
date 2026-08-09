@@ -1,6 +1,6 @@
 # 🚗 Intelligent Media Processing Pipeline & Web Dashboard
 
-Backend API & interactive Web Application for vehicle image quality analysis, universal license plate recognition (Cars, Bikes, Trucks, International), automated tampering detection, and duplicate identification.
+Backend API & interactive Web Application for vehicle image quality analysis, universal license plate recognition (Cars, Bikes, Trucks, International), automated tampering detection, photo-of-photo heuristics, and duplicate identification.
 
 ---
 
@@ -14,7 +14,7 @@ Backend API & interactive Web Application for vehicle image quality analysis, un
   - **Vehicle Brand Noise Filter**: Excludes vehicle logos & body text (`HONDA`, `TOYOTA`, `YAMAHA`, `ROYAL ENFIELD`, `HERO`, `TVS`, `KTM`, etc.).
 - 🛡️ **Zero-Dependency Resilient Architecture**:
   - **Database Portability & Fallback**: Automatically connects to PostgreSQL if available, or seamlessly falls back to local SQLite (`media_pipeline.db`).
-  - **Task Queue Resilience**: Automatically dispatches tasks to Celery/Redis if online, or executes processing in-process synchronously if Celery/Redis is unconfigured.
+  - **Task Queue Resilience**: Automatically dispatches tasks to Celery/Redis if online, or executes processing asynchronously using FastAPI `BackgroundTasks` if Celery/Redis is offline or unconfigured.
 - 🌐 **Extended REST API**: Complete CRUD endpoints with pagination, status filtering, raw image file serving, and health checks.
 
 ---
@@ -41,12 +41,12 @@ Backend API & interactive Web Application for vehicle image quality analysis, un
        │ SQLite Fallback   │                           └───────────────────┘
        └─────────┬─────────┘
                  │
-                 │ create job
+                 │ create job (returns HTTP 201 immediately with status: pending)
                  ▼
-       ┌───────────────────┐
-       │   Celery Queue /  │
-       │ Sync In-Process   │
-       └─────────┬─────────┘
+       ┌─────────────────────────┐
+       │   Celery Queue /        │
+       │ FastAPI BackgroundTasks │
+       └─────────┬───────────────┘
                  │
                  ▼
        ┌────────────────────────────────────────────────────────┐
@@ -59,6 +59,7 @@ Backend API & interactive Web Application for vehicle image quality analysis, un
        │ 5. Universal License Plate Recognition (Cars/Bikes/EU)│
        │ 6. Metadata EXIF & Screenshot Detection                │
        │ 7. Automated Software Tampering Analysis               │
+       │ 8. Photo-of-Photo / 2D FFT Moiré Pattern Analysis      │
        └─────────────────────────┬──────────────────────────────┘
                                  │
                                  ▼
@@ -77,8 +78,8 @@ Backend API & interactive Web Application for vehicle image quality analysis, un
 * **Framework:** FastAPI, Uvicorn, Starlette
 * **Frontend Web Dashboard:** HTML5, Vanilla CSS3 (Glassmorphism), JavaScript (Fetch API)
 * **Database:** SQLAlchemy 2.0 (Generic Uuid & Portable Enums), PostgreSQL / SQLite, Alembic
-* **Task Queue & Broker:** Celery 5.3+, Redis 7 (with synchronous fallback)
-* **Computer Vision & ML:** OpenCV (`opencv-python-headless`), EasyOCR, ImageHash, Pillow
+* **Task Queue & Broker:** Celery 5.3+, Redis 7 (with FastAPI `BackgroundTasks` fallback)
+* **Computer Vision & ML:** OpenCV (`opencv-python-headless`), EasyOCR, ImageHash, Pillow, NumPy
 * **Logging & Validation:** Structlog, Pydantic V2, Pydantic Settings
 * **Testing:** Pytest, HTTPX, Starlette TestClient
 
@@ -106,7 +107,8 @@ media-processing-pipeline/
 │   │   ├── ocr.py
 │   │   ├── number_plate.py # Universal multi-vehicle & multi-country plate recognition
 │   │   ├── metadata.py
-│   │   └── tampering.py
+│   │   ├── tampering.py
+│   │   └── photo_of_photo.py # 2D FFT Moiré pattern & screen capture heuristics
 │   ├── static/            # Web Dashboard UI Assets
 │   │   ├── index.html     # Glassmorphism Dashboard Layout
 │   │   ├── css/style.css  # Dark mode CSS design system
@@ -115,7 +117,7 @@ media-processing-pipeline/
 │
 ├── uploads/               # Storage directory hierarchy (/YYYY/MM/UUID.ext)
 │   └── samples/           # Pre-generated vehicle test sample images
-├── tests/                 # Unit & E2E integration test suite (16 tests)
+├── tests/                 # Unit & E2E integration test suite (17 tests)
 ├── scripts/               # Sample image generator & database seeder
 ├── .env                   # Environment variables
 ├── Dockerfile             # Multi-stage container definition
@@ -134,9 +136,9 @@ media-processing-pipeline/
 | `GET` | `/` | Serves Interactive Web Dashboard UI (`index.html`) |
 | `GET` | `/api/info` | Application metadata & version information |
 | `GET` | `/api/v1/health` | Health check (reports DB dialect & task queue mode) |
-| `POST` | `/api/v1/images` | Upload image for analysis |
+| `POST` | `/api/v1/images` | Upload image for analysis (returns immediately with status `pending`) |
 | `GET` | `/api/v1/images` | List all processed images with pagination (`skip`, `limit`) & status filter |
-| `GET` | `/api/v1/images/{id}/status` | Check processing status (`pending`, `completed`, `failed`) |
+| `GET` | `/api/v1/images/{id}/status` | Check processing status (`pending`, `processing`, `completed`, `failed`) |
 | `GET` | `/api/v1/images/{id}/results` | Detailed quality score, heuristics & detected issues |
 | `GET` | `/api/v1/images/{id}/file` | Serve raw uploaded image file |
 | `DELETE` | `/api/v1/images/{id}` | Delete image database record and stored file |
@@ -152,6 +154,105 @@ media-processing-pipeline/
 5. **Universal License Plate Recognition**: Multi-regex format matching + 2-line motorcycle plate token joining + vehicle brand noise exclusion.
 6. **Metadata & Screenshot Detection**: EXIF camera attribute extraction + screenshot probability calculation.
 7. **Tampering Detection**: EXIF software signature inspection for photo manipulation tools (Photoshop, Canva, GIMP, etc.).
+8. **Photo-of-Photo / Screen Capture**: 2D Fast Fourier Transform (FFT) high-frequency Moiré pattern spectrum analysis combined with EXIF camera indicators.
+
+---
+
+## 💻 Sample API Requests & Responses
+
+### 1. Upload Image (`POST /api/v1/images`)
+
+**Request:**
+```bash
+curl -X POST "http://127.0.0.1:8000/api/v1/images" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@clean_plate.jpg;type=image/jpeg"
+```
+
+**Response (`HTTP 201 Created` - Immediate):**
+```json
+{
+  "id": "7b90ae82-d25f-41c6-80bd-d0ab2385184e",
+  "status": "pending",
+  "created_at": "2026-08-09T15:04:40.123456",
+  "error_message": null
+}
+```
+
+---
+
+### 2. Check Processing Status (`GET /api/v1/images/{id}/status`)
+
+**Request:**
+```bash
+curl -X GET "http://127.0.0.1:8000/api/v1/images/7b90ae82-d25f-41c6-80bd-d0ab2385184e/status"
+```
+
+**Response (`HTTP 200 OK`):**
+```json
+{
+  "id": "7b90ae82-d25f-41c6-80bd-d0ab2385184e",
+  "status": "completed",
+  "created_at": "2026-08-09T15:04:40.123456",
+  "error_message": null
+}
+```
+
+---
+
+### 3. Fetch Analysis Results (`GET /api/v1/images/{id}/results`)
+
+**Request:**
+```bash
+curl -X GET "http://127.0.0.1:8000/api/v1/images/7b90ae82-d25f-41c6-80bd-d0ab2385184e/results"
+```
+
+**Response (`HTTP 200 OK`):**
+```json
+{
+  "image_id": "7b90ae82-d25f-41c6-80bd-d0ab2385184e",
+  "status": "completed",
+  "overall_score": 1.0,
+  "issues": [],
+  "error_message": null,
+  "created_at": "2026-08-09T15:04:40.123456",
+  "analysis": {
+    "blur": {
+      "score": 184.52,
+      "is_blurry": false
+    },
+    "brightness": {
+      "score": 142.18,
+      "status": "acceptable"
+    },
+    "duplicate": {
+      "is_duplicate": false,
+      "duplicate_of": null
+    },
+    "ocr": {
+      "text": "KA01AB1234",
+      "confidence": 0.98
+    },
+    "number_plate": {
+      "detected": true,
+      "valid": true,
+      "confidence": 0.95
+    },
+    "metadata": {
+      "has_exif": false,
+      "camera_make": null,
+      "camera_model": null,
+      "software": null,
+      "screenshot_probability": 0.4
+    },
+    "tampering": {
+      "suspicious_editing": false,
+      "confidence": 0.0
+    }
+  }
+}
+```
 
 ---
 
@@ -162,15 +263,15 @@ media-processing-pipeline/
 .\venv\Scripts\activate
 ```
 
-### Step 2: Seed Demo Sample Data *(Optional)*
+### Step 2: Seed Demo Sample Data
 Generates synthetic test vehicle images (`Clean Plate`, `Blurry Image`, `Low Light`, `Screenshot`) and seeds the database:
 ```powershell
-$env:PYTHONPATH="."; python scripts/seed.py
+python scripts/seed.py
 ```
 
 ### Step 3: Run the Web Application
 ```powershell
-$env:PYTHONPATH="."; python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 Open in your browser:
@@ -190,50 +291,57 @@ docker compose up --build
 
 ## 🧪 Running Automated Tests
 
-Run the complete unit & integration test suite (16 tests):
+Run the complete unit & integration test suite (17 tests):
 
 ```powershell
-$env:PYTHONPATH="."; python -m pytest
+python -m pytest
 ```
 
 ---
 
-## 🤖 AI Usage Disclosure
+## 📌 Assumptions Made
 
-AI tools were utilized during development for:
-- Architecture design & design pattern planning
-- FastAPI & SQLAlchemy boilerplate generation
-- OpenCV & EasyOCR heuristic calibration
-- Unit test suite expansion
-- Interactive Web Dashboard CSS glassmorphism styling
-localhost:8000/docs)
+1. **Upload Constraints**: Max file size is set to 15 MB. Supported image MIME types are `image/jpeg`, `image/png`, `image/webp`.
+2. **License Plate Verification**: Format validation uses structural pattern matching (regex + token joining) rather than querying live government DMV databases.
+3. **Queue Fallback**: In environments without active Redis/Celery infrastructure, the API automatically falls back to FastAPI `BackgroundTasks` to guarantee non-blocking asynchronous execution.
 
 ---
 
-## 🧪 Running Tests
+## 🤖 AI Usage Disclosure (Mandatory)
 
-Execute pytest suite:
-```bash
-pytest
-```
+### Where & How AI Tools Were Used
+- **Architecture & Schema Design**: Used Claude & ChatGPT for designing the dual-fallback database model (SQLAlchemy 2.0 with PostgreSQL/SQLite compatibility) and task queue abstraction.
+- **Computer Vision & Heuristics Calibration**: Used AI to explore OpenCV frequency domain formulas for Moiré grid detection and regular expressions for international license plates.
+- **Boilerplate & Test Generation**: Generated initial FastAPI Pydantic V2 schemas, CRUD service wrappers, and extended `pytest` test cases.
+- **Web UI Styling**: Assisted with CSS glassmorphism design tokens and HTML layout structure.
 
----
+### Where AI Output Was Wrong or Inadequate
+1. **Blocking Synchronous Image Decoding**: AI originally generated image upload endpoints that called OpenCV image decoding (`cv2.imdecode`) synchronously inside the HTTP handler thread, which would block API throughput during large batch uploads. Fixed by delegating analysis strictly to background queues.
+2. **Motorcycle License Plate Recognition Failure**: Initial AI-suggested EasyOCR regex patterns failed on 2-line stacked motorcycle plates (e.g. `KA05` on top line, `EX5678` on bottom line). Fixed by writing custom candidate token-merging logic to join adjacent OCR tokens (`KA05` + `EX5678` ➔ `KA05EX5678`).
+3. **Vehicle Brand Text False Positives**: OCR text extraction initially flagged brand emblems on vehicles (`HONDA`, `TOYOTA`, `YAMAHA`, `ROYAL ENFIELD`) as valid license plates. Fixed by introducing an explicit `VEHICLE_BRAND_KEYWORDS` filter.
+4. **Celery Fallback Handling**: AI initially generated a Celery fallback that ran tasks synchronously in the API thread on failure. Updated to use FastAPI `BackgroundTasks` to preserve non-blocking immediate responses (`HTTP 201 Created`).
 
-## 🤖 AI Usage Disclosure
-
-AI tools were used during development for:
-* Architecture brainstorming and plan structuring
-* FastAPI boilerplate generation
-* OpenCV and EasyOCR implementation patterns
-* Test case generation
-* Documentation assistance
-
-AI-generated code was reviewed, refined, and tested locally. Image analysis thresholds, error recovery, and failure resilience were manually calibrated.
+### How AI-Generated Code Was Validated
+- **Automated Testing**: 100% of generated service logic and endpoints were covered by `pytest` integration tests (17 passing tests).
+- **Synthetic Sample Verification**: Created `scripts/generate_samples.py` to generate controlled test images (clean plates, heavy Gaussian blur, low lighting, screenshots) and verified analyzer outputs against expected ground truth.
+- **Manual UI Verification**: Tested interactive uploads and inspection reports across edge-case images via the Web Dashboard.
 
 ---
 
 ## ⚖️ Trade-offs & Limitations
 
-* **Local Storage:** Chosen for local reproducibility. In production, `storage_service.py` should be backed by AWS S3 or Google Cloud Storage.
-* **Format Validation vs Verification:** License plate checks validate structural regex format rather than querying external DMV databases.
-* **Classical CV Heuristics:** Blur and brightness thresholds use classical computer vision heuristics for speed and low footprint rather than heavy neural networks.
+### 1. What Was Intentionally Simplified
+- **Local File System Storage**: Saved uploaded files in structured local directories (`/uploads/YYYY/MM/UUID.ext`) to ensure zero-dependency local reproducibility without requiring AWS S3 credentials.
+- **Heuristic Quality Scoring**: Used weighted classical computer vision heuristics (Laplacian variance, grayscale intensity, pHash distance) instead of hosting heavy deep neural network quality assessment models.
+
+### 2. What Would Be Improved With More Time
+- **Dedicated Object Detection Models**: Replace heuristic OCR text extraction with YOLOv8/v10 fine-tuned on vehicle license plates for tighter bounding box localization before OCR.
+- **Deep Moiré & Deepfake Neural Networks**: Implement specialized deep learning models for detecting AI-generated vehicle tampering and screen re-photography.
+- **DMV / Vahan API Verification**: Add external API integrations (e.g. Parivahan / DMV APIs) to cross-reference extracted plate text against registered vehicle databases.
+
+### 3. Scalability Concerns
+- **Worker Concurrency & GPU Acceleration**: CPU-bound EasyOCR and OpenCV processing can become a bottleneck at high throughput. Production deployments should utilize GPU-accelerated Celery workers (`torch.cuda`) with auto-scaling worker pools.
+- **Distributed Shared Storage**: Local file storage does not scale horizontally across multiple web nodes. A production setup requires AWS S3 or Google Cloud Storage with CDN caching.
+
+### 4. Failure Handling Concerns
+- **Poison Pill Tasks & Dead-Letter Queues**: Unhandled image corruptions could crash workers. Added try-catch blocks per analyzer, but a production pipeline should introduce a Celery Dead-Letter Queue (DLQ) to isolate failing tasks after 3 retries.

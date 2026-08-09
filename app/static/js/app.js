@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const dropZone = document.getElementById('dropZone');
+  const dropZoneContent = document.getElementById('dropZoneContent');
   const fileInput = document.getElementById('fileInput');
   const gallery = document.getElementById('imageGallery');
   const modal = document.getElementById('inspectModal');
@@ -42,13 +43,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  function resetDropZone() {
+    const target = dropZoneContent || dropZone;
+    target.innerHTML = `
+      <div class="upload-icon">📁</div>
+      <p><strong>Drag & Drop vehicle image here</strong></p>
+      <p class="subtitle">Supports JPG, PNG, WEBP up to 10MB</p>
+      <button class="btn-upload" type="button" onclick="document.getElementById('fileInput').click()">Browse Files</button>
+    `;
+  }
+
   // Upload Logic
   async function uploadFile(file) {
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      dropZone.innerHTML = '<div class="upload-icon">⏳</div><p>Processing media analysis...</p>';
+      const target = dropZoneContent || dropZone;
+      target.innerHTML = '<div class="upload-icon">⏳</div><p>Processing media analysis...</p>';
       const res = await fetch('/api/v1/images', {
         method: 'POST',
         body: formData
@@ -56,24 +68,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Upload failed');
 
-      // Reset dropzone
-      dropZone.innerHTML = `
-        <div class="upload-icon">📁</div>
-        <p><strong>Drag & Drop vehicle image here</strong></p>
-        <p class="subtitle">Supports JPG, PNG, WEBP up to 10MB</p>
-        <button class="btn-upload" type="button" onclick="document.getElementById('fileInput').click()">Browse Files</button>
-      `;
+      resetDropZone();
+      if (fileInput) fileInput.value = '';
 
       loadGallery();
       inspectImage(data.id);
     } catch (err) {
       alert('Upload Error: ' + err.message);
-      dropZone.innerHTML = `
-        <div class="upload-icon">📁</div>
-        <p><strong>Drag & Drop vehicle image here</strong></p>
-        <p class="subtitle">Supports JPG, PNG, WEBP up to 10MB</p>
-        <button class="btn-upload" type="button" onclick="document.getElementById('fileInput').click()">Browse Files</button>
-      `;
+      resetDropZone();
+      if (fileInput) fileInput.value = '';
     }
   }
 

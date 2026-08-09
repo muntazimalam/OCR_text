@@ -38,12 +38,14 @@
         </div>
         
         <form id="uploadForm">
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display: none;">
           <div class="drop-zone" id="dropZone">
-            <div class="upload-icon">📁</div>
-            <p><strong>Drag & Drop vehicle image here</strong></p>
-            <p class="subtitle">Supports JPG, PNG, WEBP up to 10MB</p>
-            <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display: none;">
-            <button class="btn-upload" type="button" onclick="document.getElementById('fileInput').click()">Browse Files</button>
+            <div id="dropZoneContent">
+              <div class="upload-icon">📁</div>
+              <p><strong>Drag & Drop vehicle image here</strong></p>
+              <p class="subtitle">Supports JPG, PNG, WEBP up to 10MB</p>
+              <button class="btn-upload" type="button" onclick="document.getElementById('fileInput').click()">Browse Files</button>
+            </div>
           </div>
         </form>
 

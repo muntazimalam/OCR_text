@@ -9,6 +9,7 @@ from app.analyzers.ocr import OCRAnalyzer
 from app.analyzers.number_plate import NumberPlateAnalyzer
 from app.analyzers.metadata import MetadataAnalyzer
 from app.analyzers.tampering import TamperingAnalyzer
+from app.analyzers.photo_of_photo import PhotoOfPhotoAnalyzer
 from app.services.image_service import ImageService
 from app.core.logging import logger
 
@@ -22,6 +23,7 @@ class AnalysisService:
         self.number_plate_analyzer = NumberPlateAnalyzer()
         self.metadata_analyzer = MetadataAnalyzer()
         self.tampering_analyzer = TamperingAnalyzer()
+        self.photo_of_photo_analyzer = PhotoOfPhotoAnalyzer()
 
     def run_pipeline(
         self, db: Session, image_id: UUID, file_path: str, sha256_hash: str
@@ -126,9 +128,23 @@ class AnalysisService:
             logger.error("tampering_analyzer_error", error=str(e))
             tampering_res = {"suspicious_editing": False, "confidence": 0.0, "error": str(e)}
 
+        # 8. Photo-of-Photo / Moiré Detection
+        try:
+            pop_res = self.photo_of_photo_analyzer.analyze(file_path, file_bytes, metadata_result=metadata_res)
+            if pop_res.get("is_photo_of_photo"):
+                issues.append({
+                    "type": "photo_of_photo",
+                    "severity": "medium",
+                    "confidence": pop_res.get("confidence", 0.80),
+                    "description": "Moiré pattern/heuristics indicate image was taken of a digital screen or printed photo"
+                })
+        except Exception as e:
+            logger.error("photo_of_photo_analyzer_error", error=str(e))
+            pop_res = {"is_photo_of_photo": False, "confidence": 0.0, "error": str(e)}
+
         # Overall Score Calculation
         overall_score = self._calculate_overall_score(
-            blur_res, brightness_res, duplicate_res, plate_res, tampering_res
+            blur_res, brightness_res, duplicate_res, plate_res, tampering_res, pop_res
         )
 
         return {
@@ -156,7 +172,8 @@ class AnalysisService:
         brightness_res: dict,
         dup_res: dict,
         plate_res: dict,
-        tampering_res: dict
+        tampering_res: dict,
+        pop_res: dict = None
     ) -> float:
         score = 1.0
 
@@ -172,5 +189,7 @@ class AnalysisService:
             score -= 0.20
         if tampering_res.get("suspicious_editing"):
             score -= 0.20
+        if pop_res and pop_res.get("is_photo_of_photo"):
+            score -= 0.15
 
         return round(max(score, 0.0), 2)

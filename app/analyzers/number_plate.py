@@ -164,6 +164,14 @@ class NumberPlateAnalyzer(BaseAnalyzer):
             if 4 <= len(joined) <= 14:
                 candidates.extend(normalize_indian_plate_candidate(joined))
 
+        # 5. Non-contiguous pairing for 2-line plates separated by small noise tokens
+        for i in range(len(raw_tokens)):
+            for k in range(1, 5):
+                if i + k < len(raw_tokens):
+                    pair = raw_tokens[i] + raw_tokens[i + k]
+                    if 4 <= len(pair) <= 14:
+                        candidates.extend(normalize_indian_plate_candidate(pair))
+
         # Deduplicate candidates preserving order
         unique_candidates = [c for c in list(dict.fromkeys(candidates)) if c and not is_brand_noise(c)]
 

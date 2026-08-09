@@ -1,3 +1,4 @@
+import gc
 from typing import Any, Dict
 from app.analyzers.base import BaseAnalyzer
 
@@ -8,8 +9,11 @@ def get_ocr_reader():
     global _easyocr_reader
     if _easyocr_reader is None:
         try:
+            import torch
+            torch.set_grad_enabled(False)
             import easyocr
-            _easyocr_reader = easyocr.Reader(['en'], gpu=False)
+            # Initialize CPU reader with low-memory configuration
+            _easyocr_reader = easyocr.Reader(['en'], gpu=False, verbose=False)
         except Exception:
             _easyocr_reader = False
     return _easyocr_reader
@@ -17,7 +21,7 @@ def get_ocr_reader():
 
 class OCRAnalyzer(BaseAnalyzer):
     """
-    Extracts text using EasyOCR with lazy singleton model initialization.
+    Extracts text using EasyOCR with memory-optimized parameters for 512MB RAM environments.
     """
     def analyze(self, image_path: str, file_bytes: bytes) -> Dict[str, Any]:
         reader = get_ocr_reader()
@@ -27,11 +31,27 @@ class OCRAnalyzer(BaseAnalyzer):
         try:
             import cv2
             import numpy as np
+            import torch
+
             nparr = np.frombuffer(file_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            input_target = img if img is not None else image_path
 
-            results = reader.readtext(input_target)
+            if img is not None:
+                h, w = img.shape[:2]
+                # Downscale large mobile camera images (>1024px) to prevent PyTorch OOM on 512MB RAM
+                if max(h, w) > 1024:
+                    scale = 1024.0 / max(h, w)
+                    img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+                input_target = img
+            else:
+                input_target = image_path
+
+            with torch.no_grad():
+                # canvas_size=1024, max_size=1024 caps PyTorch feature map RAM allocation
+                results = reader.readtext(input_target, canvas_size=1024, max_size=1024)
+
+            gc.collect()
+
             if not results:
                 return {"text": "", "confidence": 0.0, "detections": []}
 
@@ -56,4 +76,5 @@ class OCRAnalyzer(BaseAnalyzer):
                 "detections": detections
             }
         except Exception as e:
+            gc.collect()
             return {"text": None, "confidence": None, "error": str(e)}

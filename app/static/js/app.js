@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initial data load
   loadStats();
-  loadGallery();
+  loadGallery(true);
 
   // Browse button
   if (browseBtn) browseBtn.addEventListener('click', () => fileInput.click());
@@ -257,8 +257,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ─── Gallery Load ──────────────────────────────────────────────────────────
-  async function loadGallery() {
-    showSkeletons(6);
+  async function loadGallery(isInitial = false) {
+    if (isInitial || !gallery.children.length || gallery.querySelector('.skeleton-card')) {
+      showSkeletons(6);
+    }
     try {
       let url = '/api/v1/images?limit=50';
       if (currentFilter !== 'all') url += `&status=${currentFilter}`;
@@ -341,14 +343,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ─── Inspect Modal ────────────────────────────────────────────────────────
-  async function inspectImage(imageId) {
+  async function inspectImage(imageId, isPolling = false) {
     stopModalPolling();
-    resetScoreRing('⏳');
-    document.getElementById('metricsContainer').innerHTML = '';
-    document.getElementById('issuesContainer').innerHTML = '';
-    document.getElementById('modalTitle').textContent = `Inspection Report — ${imageId.substring(0, 8)}`;
-    document.getElementById('modalImage').src = `/api/v1/images/${imageId}/file`;
-    modal.classList.add('active');
+    if (!isPolling) {
+      resetScoreRing('⏳');
+      document.getElementById('metricsContainer').innerHTML = '';
+      document.getElementById('issuesContainer').innerHTML = '';
+      document.getElementById('modalTitle').textContent = `Inspection Report — ${imageId.substring(0, 8).toUpperCase()}`;
+      document.getElementById('modalImage').src = `/api/v1/images/${imageId}/file`;
+      modal.classList.add('active');
+    }
 
     try {
       const res = await fetch(`/api/v1/images/${imageId}/results`);
@@ -364,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
           Pipeline is analyzing this image...</p>`;
         issuesContainer.innerHTML = `<div class="issue-chip issue-medium">
           ⏳ Analysis in progress — updating automatically...</div>`;
-        inspectPollTimer = setTimeout(() => { inspectImage(imageId); loadGallery(); loadStats(); }, 2500);
+        inspectPollTimer = setTimeout(() => { inspectImage(imageId, true); loadGallery(); loadStats(); }, 2500);
         return;
       }
 

@@ -9,18 +9,9 @@ venv/
 # Environment variables
 .env
 
-# SQLite Database
-*.db
-*.sqlite3
-
 # IDE
 .vscode/
 .idea/
-
-# Uploaded files (track samples directory and .gitkeep)
-uploads/*
-!uploads/.gitkeep
-!uploads/samples/
 
 # Testing
 .pytest_cache/

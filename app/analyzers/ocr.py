@@ -93,6 +93,50 @@ def _crop_and_enhance_patch(img_bgr: np.ndarray, roi: Tuple[int, int, int, int])
     return patch_enhanced
 
 
+def _tesseract_extract(img_bgr: np.ndarray) -> Optional[Dict[str, Any]]:
+    """Tesseract OCR fallback used when EasyOCR models are unavailable."""
+    try:
+        import pytesseract
+        from PIL import Image as PILImage
+    except Exception:
+        return None
+    try:
+        pil_img = PILImage.fromarray(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
+        detections = []
+        seen_texts = set()
+        for psm in ("7", "11", "6"):
+            try:
+                data = pytesseract.image_to_data(
+                    pil_img,
+                    config=f"--psm {psm} -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+                    output_type=pytesseract.Output.DICT,
+                )
+            except Exception:
+                continue
+            for i, raw in enumerate(data.get("text", [])):
+                cleaned = re.sub(r"[^A-Z0-9]", "", str(raw).upper())
+                if len(cleaned) < 2 or cleaned in seen_texts:
+                    continue
+                try:
+                    conf = float(data.get("conf", [0])[i])
+                except (TypeError, ValueError, IndexError):
+                    conf = 0.0
+                if conf < 30.0:
+                    continue
+                seen_texts.add(cleaned)
+                detections.append({"text": cleaned, "confidence": round(conf / 100.0, 2)})
+        if not detections:
+            return None
+        confs = [d["confidence"] for d in detections]
+        return {
+            "text": " ".join(d["text"] for d in detections),
+            "confidence": round(sum(confs) / len(confs), 2),
+            "detections": detections,
+        }
+    except Exception:
+        return None
+
+
 def _run_easyocr(
     reader,
     img_bgr: np.ndarray,

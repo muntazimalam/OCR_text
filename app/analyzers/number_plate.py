@@ -192,28 +192,17 @@ class NumberPlateAnalyzer(BaseAnalyzer):
                         best_format = fmt_name
                         is_valid = True
 
-        # Phase 2: Universal structural fallback for non-Indian or non-standard vehicle plates
-        if not is_valid:
-            for candidate in unique_candidates:
-                if not 5 <= len(candidate) <= 12 or is_brand_noise(candidate):
-                    continue
-                if candidate in NOISE_WORDS or candidate.startswith(NOISE_PREFIXES):
-                    continue
-                if len(candidate) == 10 and candidate.isdigit():
-                    continue
-                has_alpha = sum(1 for c in candidate if c.isalpha())
-                has_digit = sum(1 for c in candidate if c.isdigit())
-                if has_alpha >= 2 and has_digit >= 2:
-                    best_plate = candidate
-                    best_conf = 0.85
-                    best_format = "Universal Vehicle Plate"
-                    is_valid = True
-                    break
+        # Enforce strict 10-character length requirement for valid license plates
+        if best_plate and len(best_plate) != 10:
+            best_plate = None
+            is_valid = False
+            best_conf = 0.0
+            best_format = None
 
         return {
-            "detected": best_plate is not None,
+            "detected": best_plate is not None and is_valid,
             "valid": is_valid,
-            "confidence": round(best_conf, 2) if best_plate else 0.0,
-            "plate_text": best_plate,
-            "format_type": best_format
+            "confidence": round(best_conf, 2) if (best_plate and is_valid) else 0.0,
+            "plate_text": best_plate if is_valid else None,
+            "format_type": best_format if is_valid else None
         }

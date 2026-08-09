@@ -92,8 +92,14 @@ document.addEventListener('DOMContentLoaded', () => {
       loadGallery();
       inspectImage(data.id);
     } catch (err) {
-      alert('Upload Error: ' + err.message);
-      resetDropZone();
+      console.error('Upload Error:', err);
+      const target = dropZoneContent || dropZone;
+      target.innerHTML = `
+        <div class="upload-icon">⚠️</div>
+        <p><strong style="color: #ff8e8e;">Upload Failed</strong></p>
+        <p class="subtitle">${err.message}</p>
+        <button class="btn-upload" type="button" onclick="document.getElementById('fileInput').click()">Try Again</button>
+      `;
       if (fileInput) fileInput.value = '';
     }
   }
@@ -114,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = new File([blob], fileName, { type: blob.type });
       uploadFile(file);
     } catch (err) {
-      alert('Failed to load sample image: ' + err.message);
+      console.error('Failed to load sample image:', err);
     }
   };
 
@@ -138,16 +144,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = document.createElement('div');
         card.className = 'image-card';
 
-        // Fetch score if completed
         let scoreTag = `<span class="score-badge score-medium">${item.status}</span>`;
         if (item.status === 'completed') {
-          const resResult = await fetch(`/api/v1/images/${item.id}/results`);
-          if (resResult.ok) {
-            const resData = await parseResponse(resResult);
-            const score = resData.overall_score !== null ? Math.round(resData.overall_score * 100) : 100;
-            const scoreClass = score >= 80 ? 'score-high' : (score >= 50 ? 'score-medium' : 'score-low');
-            scoreTag = `<span class="score-badge ${scoreClass}">Score: ${score}%</span>`;
-          }
+          const score = item.overall_score !== null && item.overall_score !== undefined ? Math.round(item.overall_score * 100) : 100;
+          const scoreClass = score >= 80 ? 'score-high' : (score >= 50 ? 'score-medium' : 'score-low');
+          scoreTag = `<span class="score-badge ${scoreClass}">Score: ${score}%</span>`;
+        } else if (item.status === 'failed') {
+          scoreTag = `<span class="score-badge score-low">Failed</span>`;
         }
 
         card.innerHTML = `
@@ -262,7 +265,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       modal.classList.add('active');
     } catch (err) {
-      alert('Inspection Error: ' + err.message);
+      stopModalPolling();
+      console.error('Inspection Error:', err);
+      document.getElementById('modalTitle').textContent = `Inspection Report — ${imageId ? imageId.substring(0, 8) : 'Error'}`;
+      document.getElementById('scoreDisplay').textContent = '⚠️';
+      document.getElementById('metricsContainer').innerHTML = `<p class="subtitle" style="padding: 1rem; text-align: center; color: #ff8e8e;">Unable to load inspection details.</p>`;
+      document.getElementById('issuesContainer').innerHTML = `<div class="issue-chip issue-high">⚠️ <strong>Error</strong>: ${err.message || 'Image record not found or server restarted.'}</div>`;
+      modal.classList.add('active');
     }
   }
 

@@ -86,12 +86,34 @@ class ImageService:
 
     @staticmethod
     def get_all_images(db: Session, skip: int = 0, limit: int = 20, status_filter: Optional[ImageStatus] = None):
-        query = db.query(Image)
+        from sqlalchemy.orm import joinedload
+        query = db.query(Image).options(joinedload(Image.analysis_result))
         if status_filter:
             query = query.filter(Image.status == status_filter)
         total = query.count()
         items = query.order_by(Image.created_at.desc()).offset(skip).limit(limit).all()
-        return items, total
+
+        response_items = []
+        for img in items:
+            item_dict = {
+                "id": img.id,
+                "original_filename": img.original_filename,
+                "stored_filename": img.stored_filename,
+                "file_path": img.file_path,
+                "content_type": img.content_type,
+                "file_size": img.file_size,
+                "width": img.width,
+                "height": img.height,
+                "sha256_hash": img.sha256_hash,
+                "status": img.status,
+                "error_message": img.error_message,
+                "overall_score": img.analysis_result.overall_score if img.analysis_result else None,
+                "created_at": img.created_at,
+                "updated_at": img.updated_at
+            }
+            response_items.append(item_dict)
+
+        return response_items, total
 
     @staticmethod
     def delete_image(db: Session, image_id: UUID) -> bool:

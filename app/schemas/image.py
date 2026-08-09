@@ -35,6 +35,7 @@ class ImageResponse(ImageBase):
     stored_filename: str
     file_path: str
     status: ImageStatus
+    overall_score: Optional[float] = None
     error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime

@@ -12,6 +12,26 @@ from app.core.logging import setup_logging, logger
 import app.models  # Ensure models are imported for create_all
 
 
+def _sync_schema():
+    """Add missing columns to existing tables (create_all won't alter existing tables)."""
+    from app.models.analysis import AnalysisResult
+    import sqlalchemy as sa
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "analysis_results" not in inspector.get_table_names():
+        return
+
+    existing_cols = {c["name"] for c in inspector.get_columns("analysis_results")}
+    for column in AnalysisResult.__table__.columns:
+        if column.name not in existing_cols:
+            col_type = str(column.type)
+            ddl = f'ALTER TABLE analysis_results ADD COLUMN "{column.name}" {col_type}'
+            with engine.begin() as conn:
+                conn.execute(text(ddl))
+            logger.info("schema_column_added", table="analysis_results", column=column.name)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
@@ -20,6 +40,7 @@ async def lifespan(app: FastAPI):
     # Auto-create tables if they don't exist
     try:
         Base.metadata.create_all(bind=engine)
+        _sync_schema()
         logger.info("database_tables_initialized")
     except Exception as e:
         logger.error("database_init_error", error=str(e))

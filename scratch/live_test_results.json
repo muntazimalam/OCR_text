@@ -1,0 +1,48 @@
+[
+  {
+    "file": "uploads/samples/clean_plate.jpg",
+    "id": "469c32f9-7c5b-4fc9-8386-e31f46b1497d",
+    "results": {
+      "image_id": "469c32f9-7c5b-4fc9-8386-e31f46b1497d",
+      "status": "completed",
+      "analysis": {
+        "blur": {
+          "score": 373.52,
+          "is_blurry": false
+        },
+        "brightness": {
+          "score": 161.03,
+          "status": "acceptable"
+        },
+        "duplicate": {
+          "is_duplicate": false,
+          "duplicate_of": null
+        },
+        "ocr": {
+          "text": "H170",
+          "confidence": 0.9
+        },
+        "number_plate": {
+          "detected": true,
+          "valid": true,
+          "confidence": 0.95
+        },
+        "metadata": {
+          "has_exif": false,
+          "camera_make": null,
+          "camera_model": null,
+          "software": null,
+          "screenshot_probability": 0.4
+        },
+        "tampering": {
+          "suspicious_editing": false,
+          "confidence": 0.0
+        }
+      },
+      "issues": [],
+      "overall_score": 1.0,
+      "error_message": null,
+      "created_at": "2026-08-09T13:50:34.528991"
+    }
+  }
+]

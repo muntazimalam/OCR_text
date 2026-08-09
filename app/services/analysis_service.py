@@ -188,6 +188,7 @@ class AnalysisService:
             "plate_detected": plate_res.get("detected", False),
             "plate_valid": plate_res.get("valid", False),
             "plate_confidence": plate_res.get("confidence"),
+            "plate_text": plate_res.get("plate_text"),
             "tampering_info": tampering_res,
             "metadata_info": metadata_res,
             "overall_score": overall_score,

@@ -65,37 +65,19 @@ def normalize_indian_plate_candidate(token: str) -> List[str]:
         st_raw = cleaned[:2]
         st_clean = "".join(CHAR_SUB_TO_ALPHA.get(c, c) for c in st_raw)
 
-        if st_clean not in STATE_CODES:
-            if any(k in cleaned for k in ["TN", "JO", "SX", "TC", "LN", "BT", "LM"]):
-                st_clean = "TN"
-            elif any(k in cleaned for k in ["MH", "ML", "MY", "NW", "PQ"]):
-                st_clean = "MH"
-            elif any(k in cleaned for k in ["KA", "KI", "KQ", "KM", "H1", "H7"]):
-                st_clean = "KA"
-            elif any(k in cleaned for k in ["DL", "DI", "DQ"]):
-                st_clean = "DL"
+        if st_clean in STATE_CODES or len(cleaned) >= 8:
+            dist_raw = cleaned[2:4]
+            dist_clean = "".join(CHAR_SUB_TO_DIGIT.get(c, c) for c in dist_raw)
 
-        dist_raw = cleaned[2:4]
-        dist_clean = "".join(CHAR_SUB_TO_DIGIT.get(c, c) for c in dist_raw)
+            ser_raw = cleaned[4:6]
+            ser_clean = "".join(CHAR_SUB_TO_ALPHA.get(c, c) for c in ser_raw)
 
-        ser_raw = cleaned[4:6]
-        ser_clean = "".join(CHAR_SUB_TO_ALPHA.get(c, c) for c in ser_raw)
+            num_raw = cleaned[6:10] if len(cleaned) >= 8 else cleaned[6:]
+            num_clean = "".join(CHAR_SUB_TO_DIGIT.get(c, c) for c in num_raw)
 
-        num_raw = cleaned[6:10] if len(cleaned) >= 8 else "1234"
-        num_clean = "".join(CHAR_SUB_TO_DIGIT.get(c, c) for c in num_raw)
-
-        norm_pos = f"{st_clean}{dist_clean}{ser_clean}{num_clean}"
-        if norm_pos not in candidates:
-            candidates.append(norm_pos)
-
-    # Candidate 3: Full-token noisy string resolution
-    if len(cleaned) >= 3:
-        if any(k in cleaned for k in ["SX", "JO", "LM", "5754", "BT"]):
-            candidates.append("TN05BT5754")
-        elif any(k in cleaned for k in ["ML", "MY", "8556", "NW"]):
-            candidates.append("MH12NW8556")
-        elif any(k in cleaned for k in ["KI", "KQ", "H170", "H17", "1234"]):
-            candidates.append("KA01AB1234")
+            norm_pos = f"{st_clean}{dist_clean}{ser_clean}{num_clean}"
+            if norm_pos not in candidates:
+                candidates.append(norm_pos)
 
     return candidates
 
@@ -189,7 +171,7 @@ class NumberPlateAnalyzer(BaseAnalyzer):
         # Phase 2: Universal Fallback Heuristic
         if not is_valid:
             for candidate in unique_candidates:
-                if 4 <= len(candidate) <= 12 and not is_brand_noise(candidate):
+                if 5 <= len(candidate) <= 12 and not is_brand_noise(candidate):
                     has_alpha = any(c.isalpha() for c in candidate)
                     has_digit = any(c.isdigit() for c in candidate)
                     if has_alpha and has_digit:
@@ -198,13 +180,6 @@ class NumberPlateAnalyzer(BaseAnalyzer):
                         best_format = "Universal Vehicle Plate"
                         is_valid = True
                         break
-
-        # Phase 3: License Plate Box Detected Fallback
-        if not is_valid and len(raw_tokens) > 0 and not any(is_brand_noise(t) for t in raw_tokens):
-            best_plate = "TN05BT5754" if any(k in full_text_cleaned for k in ["TN", "5754", "SX", "JO", "LM"]) else ("MH12NW8556" if any(k in full_text_cleaned for k in ["MH", "8556", "ML", "MY"]) else "KA01AB1234")
-            best_conf = 0.90
-            best_format = "India Standard"
-            is_valid = True
 
         return {
             "detected": best_plate is not None,

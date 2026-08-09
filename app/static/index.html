@@ -3,110 +3,128 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Intelligent media processing pipeline for vehicle image quality analysis, OCR license plate validation and tampering detection.">
-  <meta name="theme-color" content="#0b0d14">
-  <title>Media Processing Pipeline — Vehicle Analysis</title>
+  <meta name="description" content="Vehicle forensics pipeline — image quality analysis, universal license plate recognition, tampering detection.">
+  <meta name="theme-color" content="#030509">
+  <title>Vehicle Forensics Lab — Media Processing Pipeline</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <!-- Toast Container -->
+  <!-- ═══ VFX LAYERS ═══ -->
+  <canvas id="fxCanvas" aria-hidden="true"></canvas>
+  <div class="noise" aria-hidden="true"></div>
+  <div id="cursorGlow" aria-hidden="true"></div>
+
+  <!-- ═══ TOAST ═══ -->
   <div id="toast-container" aria-live="polite"></div>
 
   <div class="container">
-    <header>
+    <!-- ═══ HUD HEADER ═══ -->
+    <header class="hud-header">
       <div class="logo-section">
-        <div class="logo-icon" aria-hidden="true">🚗</div>
-        <div>
-          <h1>Media Processing Pipeline</h1>
-          <p class="subtitle">Vehicle Quality Analysis · OCR License Plate Validation · Tampering Detection</p>
+        <div class="radar-logo" aria-hidden="true">
+          <span class="rings r1"></span>
+          <span class="rings r2"></span>
+          <span class="rings r3"></span>
+          <span class="sweep"></span>
+          <span class="core">🚙</span>
+        </div>
+        <div class="brand-titles">
+          <h1>VEHICLE FORENSICS LAB</h1>
+          <p class="subtitle">Media Processing Pipeline</p>
         </div>
       </div>
-      <div class="header-badges">
-        <div class="badge-status">
-          <span class="indicator-dot" aria-label="API online"></span> API v1.0.0
+
+      <div class="header-right">
+        <span class="hud-badge">
+          <span class="indicator-dot" aria-label="API online"></span> API&nbsp;v1.0.0
+        </span>
+        <a href="/docs" target="_blank" rel="noopener" class="hud-badge">⌘ SWAGGER</a>
+        <a href="/api/v1/health" target="_blank" rel="noopener" class="hud-badge">♥ HEALTH</a>
+        <div id="sysClock" aria-hidden="true">
+          <div class="t">--:--:--</div>
+          <div class="d">----/--/--</div>
         </div>
-        <a href="/docs" target="_blank" rel="noopener" class="badge-status" style="text-decoration: none; color: inherit;">
-          📘 Swagger
-        </a>
-        <a href="/api/v1/health" target="_blank" rel="noopener" class="badge-status" style="text-decoration: none; color: inherit;">
-          ❤️ Health
-        </a>
+        <span class="hud-badge"><span class="rec-dot"></span> LIVE</span>
       </div>
     </header>
 
-    <!-- Pipeline Statistics Banner -->
+    <!-- ═══ PIPELINE STATISTICS ═══ -->
     <div class="stats-banner" id="statsBanner" aria-label="Pipeline statistics">
-      <div class="stat-card" style="--stat-color: #9ca3af;">
-        <div class="stat-value skeleton" id="statTotal" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
+      <div class="stat-card" style="--stat-color: #8fb3c7;">
+        <div class="stat-value skeleton" id="statTotal" style="height:2.1rem; width:55%; border-radius:4px;">&nbsp;</div>
         <div class="stat-label">Total Processed</div>
       </div>
-      <div class="stat-card" style="--stat-color: #34d399;">
-        <div class="stat-value skeleton" id="statCompleted" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
+      <div class="stat-card" style="--stat-color: #00ff9d;">
+        <div class="stat-value skeleton" id="statCompleted" style="height:2.1rem; width:55%; border-radius:4px;">&nbsp;</div>
         <div class="stat-label">Completed</div>
       </div>
-      <div class="stat-card" style="--stat-color: #f87171;">
-        <div class="stat-value skeleton" id="statFailed" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
+      <div class="stat-card" style="--stat-color: #ff4d5e;">
+        <div class="stat-value skeleton" id="statFailed" style="height:2.1rem; width:55%; border-radius:4px;">&nbsp;</div>
         <div class="stat-label">Failed</div>
       </div>
-      <div class="stat-card" style="--stat-color: #fbbf24;">
-        <div class="stat-value skeleton" id="statPending" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
+      <div class="stat-card" style="--stat-color: #ffb42b;">
+        <div class="stat-value skeleton" id="statPending" style="height:2.1rem; width:55%; border-radius:4px;">&nbsp;</div>
         <div class="stat-label">In Queue</div>
       </div>
-      <div class="stat-card" style="--stat-color: #a78bfa;">
-        <div class="stat-value skeleton" id="statPassRate" style="height:2.4rem; width:70%; border-radius:6px;">&nbsp;</div>
+      <div class="stat-card" style="--stat-color: #00e5ff;">
+        <div class="stat-value skeleton" id="statPassRate" style="height:2.1rem; width:65%; border-radius:4px;">&nbsp;</div>
         <div class="stat-label">Pass Rate</div>
       </div>
     </div>
 
     <main class="dashboard-grid">
-      <!-- Upload Panel -->
-      <section class="card" aria-label="Upload vehicle image">
+      <!-- ═══ UPLOAD PANEL ═══ -->
+      <section class="hud-card" aria-label="Upload vehicle image">
         <div class="card-title">
-          <span>Upload &amp; Analyze</span>
-          <span style="font-size: 0.72rem; color: var(--text-muted); font-weight:400; font-family: var(--font-mono);">Async</span>
+          <span class="tag">UPLOAD &amp; ANALYZE</span>
+          <span class="hud-status">ASYNC PIPELINE</span>
         </div>
 
         <form id="uploadForm" aria-label="Image upload form">
           <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display: none;" aria-label="Select image file">
           <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Drag and drop zone">
+            <div class="grid-help" aria-hidden="true">
+              <span class="a"></span><span class="b"></span><span class="c"></span><span class="d"></span>
+            </div>
             <div id="dropZoneContent">
-              <span class="upload-icon" aria-hidden="true">📁</span>
-              <p><strong>Drag &amp; Drop vehicle image here</strong></p>
-              <p class="subtitle">Supports JPG, PNG, WEBP · Max 10MB</p>
-              <button class="btn-upload" type="button" id="browseBtn">
-                Browse Files
-              </button>
+              <span class="upload-icon" aria-hidden="true">📡</span>
+              <p><strong>Drag vehicle image into scan zone</strong></p>
+              <p class="subtitle">JPG · PNG · WEBP — 15MB</p>
+              <button class="btn-upload" type="button" id="browseBtn">Browse Files</button>
             </div>
           </div>
         </form>
 
         <div class="quick-samples">
-          <div class="samples-label">⚡ One-Click Test Samples</div>
+          <div class="samples-label">One-Click Test Samples</div>
           <div class="samples-btns">
-            <button class="btn-sample" id="sampleClean"      onclick="testSample('clean')">🟢 Clean Plate</button>
-            <button class="btn-sample" id="sampleBlurry"     onclick="testSample('blurry')">🔴 Blurry Image</button>
-            <button class="btn-sample" id="sampleDark"       onclick="testSample('dark')">🌙 Low Light</button>
-            <button class="btn-sample" id="sampleScreenshot" onclick="testSample('screenshot')">📱 Screenshot</button>
+            <button class="btn-sample" id="sampleClean"      style="--samp-color:#00ff9d;" onclick="testSample('clean')">▸ Clean Plate</button>
+            <button class="btn-sample" id="sampleBlurry"     style="--samp-color:#ff4d5e;" onclick="testSample('blurry')">▸ Blurry Image</button>
+            <button class="btn-sample" id="sampleDark"       style="--samp-color:#8fb3c7;" onclick="testSample('dark')">▸ Low Light</button>
+            <button class="btn-sample" id="sampleScreenshot" style="--samp-color:#ffb42b;" onclick="testSample('screenshot')">▸ Screenshot</button>
           </div>
         </div>
       </section>
 
-      <!-- Media Gallery Panel -->
-      <section class="card" aria-label="Processed media gallery">
+      <!-- ═══ GALLERY PANEL ═══ -->
+      <section class="hud-card" aria-label="Processed media gallery">
         <div class="gallery-controls">
-          <div class="card-title" style="margin: 0;">Processed Media Gallery</div>
+          <div class="card-title" style="margin:0;">
+            <span class="tag" style="--c:#ffb42b;">PROCESSED GALLERY</span>
+          </div>
           <div class="filter-group" role="group" aria-label="Filter images by status">
-            <button class="filter-btn active" data-filter="all"       id="filterAll">All</button>
-            <button class="filter-btn"         data-filter="completed" id="filterCompleted">Completed</button>
-            <button class="filter-btn"         data-filter="pending"   id="filterPending">Pending</button>
-            <button class="filter-btn"         data-filter="failed"    id="filterFailed">Failed</button>
+            <button class="filter-btn active" data-filter="all"        id="filterAll">All</button>
+            <button class="filter-btn"        data-filter="completed"  id="filterCompleted">Completed</button>
+            <button class="filter-btn"        data-filter="pending"    id="filterPending">Pending</button>
+            <button class="filter-btn"        data-filter="failed"     id="filterFailed">Failed</button>
           </div>
         </div>
 
         <div class="image-grid" id="imageGallery" aria-live="polite" aria-label="Image gallery grid">
-          <!-- Skeleton loaders shown on initial load -->
+          <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line-sm"></div></div>
+          <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line-sm"></div></div>
           <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line-sm"></div></div>
           <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line-sm"></div></div>
           <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line-sm"></div></div>
@@ -114,9 +132,16 @@
         </div>
       </section>
     </main>
+
+    <!-- ═══ HUD FOOTER ═══ -->
+    <footer class="hud-footer">
+      <span>PIPELINE&nbsp;v4.2<span class="pipe"></span>CV-HEURISTICS&nbsp;ONLINE<span class="pipe"></span>8-STAGE&nbsp;ANALYSIS</span>
+      <span class="scan-line" aria-hidden="true"></span>
+      <span>AUTO-CALIBRATED · <span id="footerClock">--:--:--</span> UTC</span>
+    </footer>
   </div>
 
-  <!-- Inspection Modal -->
+  <!-- ═══ INSPECTION MODAL ═══ -->
   <div class="modal-overlay" id="inspectModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-container">
       <div class="modal-header">
@@ -125,27 +150,33 @@
       </div>
       <div class="modal-grid">
         <div>
-          <img src="" id="modalImage" class="modal-img-preview" alt="Vehicle inspection preview">
-          
-          <!-- Perfectly Centered Score Ring -->
+          <div class="modal-img-wrap">
+            <img src="" id="modalImage" class="modal-img-preview" alt="Vehicle inspection preview">
+          </div>
+
           <div class="score-ring-container">
             <div class="score-ring-wrapper">
-              <svg class="score-ring-svg" width="110" height="110" viewBox="0 0 110 110" aria-hidden="true">
-                <circle class="score-ring-bg"   cx="55" cy="55" r="44"/>
-                <circle class="score-ring-fill" cx="55" cy="55" r="44" id="scoreRingFill"/>
+              <svg class="score-ring-svg" width="118" height="118" viewBox="0 0 118 118" aria-hidden="true">
+                <g class="score-ring-ticks">
+                  <circle cx="59" cy="59" r="52" stroke-dasharray="2.5 11.64"/>
+                  <circle cx="59" cy="59" r="42" stroke-dasharray="0.8 8.1"/>
+                </g>
+                <circle class="score-ring-bg"   cx="59" cy="59" r="44"/>
+                <circle class="score-ring-fill" cx="59" cy="59" r="44" id="scoreRingFill"/>
               </svg>
               <div id="scoreDisplay">—</div>
             </div>
             <div class="score-ring-text">Overall Quality Score</div>
           </div>
         </div>
+
         <div>
-          <h3 style="font-size: 0.85rem; font-weight:700; margin-bottom: 0.65rem; color: var(--accent-violet); text-transform: uppercase; letter-spacing: 0.08em;">Analysis Heuristics</h3>
+          <div class="metrics-heading">Analysis Heuristics</div>
           <div class="metrics-list" id="metricsContainer">
             <!-- Dynamic metrics injected by app.js -->
           </div>
 
-          <h3 style="font-size: 0.85rem; font-weight:700; margin-top: 1.3rem; margin-bottom: 0.5rem; color: var(--accent-violet); text-transform: uppercase; letter-spacing: 0.08em;">Detected Issues</h3>
+          <div class="issues-heading">System Flags</div>
           <div class="issues-list" id="issuesContainer">
             <!-- Dynamic issues injected by app.js -->
           </div>

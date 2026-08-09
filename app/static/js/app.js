@@ -55,6 +55,26 @@ function showSkeletons(count = 4) {
     </div>`).join('');
 }
 
+// ─── Animated Count-Up ───────────────────────────────────────────────────────
+function animateCount(el, finalVal) {
+  const raw = String(finalVal).replace(/[^0-9.%]/g, '').trim();
+  const n = parseFloat(raw);
+  if (!isFinite(n) || raw.includes('%')) {
+    el.textContent = finalVal;
+    return;
+  }
+  const suffix = String(finalVal).replace(/[0-9]/g, '');
+  const dur = 900;
+  const t0 = performance.now();
+  const step = (now) => {
+    const p = Math.min((now - t0) / dur, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(n * eased) + suffix;
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 // ─── Stats Banner ─────────────────────────────────────────────────────────────
 async function loadStats() {
   try {
@@ -66,7 +86,7 @@ async function loadStats() {
       if (!el) return;
       el.classList.remove('skeleton');
       el.style.cssText = '';
-      el.textContent = val;
+      animateCount(el, val);
     };
     set('statTotal',    d.total ?? '—');
     set('statCompleted', d.completed ?? '—');
@@ -127,9 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function resetDropZone() {
     const target = dropZoneContent || dropZone;
     target.innerHTML = `
-      <span class="upload-icon" aria-hidden="true">📁</span>
-      <p><strong>Drag &amp; Drop vehicle image here</strong></p>
-      <p class="subtitle">Supports JPG, PNG, WEBP · Max 10MB</p>
+      <span class="upload-icon" aria-hidden="true">📡</span>
+      <p><strong>Drag vehicle image into scan zone</strong></p>
+      <p class="subtitle">JPG · PNG · WEBP — 15MB</p>
       <button class="btn-upload" type="button" id="browseBtn">Browse Files</button>
     `;
     document.getElementById('browseBtn')?.addEventListener('click', () => fileInput.click());
@@ -140,7 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const formData = new FormData();
     formData.append('file', file);
     const target = dropZoneContent || dropZone;
-    target.innerHTML = `<span class="upload-icon">⏳</span><p>Uploading &amp; queuing analysis...</p>`;
+    target.innerHTML = `<span class="upload-icon">⏳</span><p><strong>Uploading &amp; queuing analysis...</strong></p>
+      <p class="subtitle">ENTERING SCAN QUEUE</p>`;
 
     try {
       const res = await fetch('/api/v1/images', { method: 'POST', body: formData });
@@ -157,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Upload Error:', err);
       target.innerHTML = `
         <span class="upload-icon">⚠️</span>
-        <p><strong style="color:#ff8e8e">Upload Failed</strong></p>
+        <p><strong style="color:#ff4d5e">Upload Interrupted</strong></p>
         <p class="subtitle">${err.message}</p>
         <button class="btn-upload" type="button" id="browseBtn">Try Again</button>
       `;
@@ -418,4 +439,149 @@ document.addEventListener('DOMContentLoaded', () => {
       modal.classList.remove('active');
     }
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// VFX MODULE — particle network, cursor glow, 3D tilt, live clocks
+// ═══════════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ─── 1. Particle Neural Network ────────────────────────────────────────
+  const canvas = document.getElementById('fxCanvas');
+  if (canvas && !reduced) {
+    const ctx = canvas.getContext('2d');
+    let W, H, particles = [];
+    const DPR = Math.min(window.devicePixelRatio || 1, 1.75);
+    const mouse = { x: null, y: null };
+
+    const COLORS = ['0,229,255', '255,180,43', '139,123,255'];
+
+    function resize() {
+      W = canvas.width = window.innerWidth * DPR;
+      H = canvas.height = window.innerHeight * DPR;
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      const count = Math.min(90, Math.floor((window.innerWidth * window.innerHeight) / 24000));
+      particles = Array.from({ length: count }, () => ({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.22,
+        vy: (Math.random() - 0.5) * 0.22,
+        r: Math.random() * 1.6 + 0.6,
+        c: COLORS[Math.floor(Math.random() * COLORS.length)]
+      }));
+    }
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('mousemove', (e) => {
+      mouse.x = e.clientX * DPR;
+      mouse.y = e.clientY * DPR;
+    }, { passive: true });
+    resize();
+
+    const LINK_DIST = 165 * DPR;
+
+    (function tick() {
+      ctx.clearRect(0, 0, W, H);
+      for (const p of particles) {
+        if (p.x < 0 || p.x > W) p.vx *= -1;
+        if (p.y < 0 || p.y > H) p.vy *= -1;
+        if (mouse.x != null) {
+          const dx = mouse.x - p.x, dy = mouse.y - p.y;
+          const d = Math.hypot(dx, dy);
+          if (d < 230 * DPR && d > 0.01) {
+            p.vx += (dx / d) * 0.008;
+            p.vy += (dy / d) * 0.008;
+          }
+          const cap = 0.55;
+          p.vx = Math.max(-cap, Math.min(cap, p.vx));
+          p.vy = Math.max(-cap, Math.min(cap, p.vy));
+        }
+        p.x += p.vx; p.y += p.vy;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * DPR, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${p.c},0.75)`;
+        ctx.fill();
+      }
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const a = particles[i], b = particles[j];
+          const dx = a.x - b.x, dy = a.y - b.y;
+          const d = Math.hypot(dx, dy);
+          if (d < LINK_DIST) {
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = `rgba(0,229,255,${(1 - d / LINK_DIST) * 0.14})`;
+            ctx.lineWidth = 1 * DPR;
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(tick);
+    })();
+  } else if (canvas) {
+    canvas.style.display = 'none';
+  }
+
+  // ─── 2. Cursor Glow ────────────────────────────────────────────────────
+  const glow = document.getElementById('cursorGlow');
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
+  if (glow && !reduced && !isTouch) {
+    let gx = -500, gy = -500, tx = -500, ty = -500;
+    document.addEventListener('mousemove', (e) => { tx = e.clientX; ty = e.clientY; }, { passive: true });
+    (function glowTick() {
+      gx += (tx - gx) * 0.12;
+      gy += (ty - gy) * 0.12;
+      glow.style.transform = `translate(${gx}px, ${gy}px) translate(-50%, -50%)`;
+      requestAnimationFrame(glowTick);
+    })();
+  } else if (glow) {
+    glow.style.display = 'none';
+  }
+
+  // ─── 3. 3D Tilt Cards ──────────────────────────────────────────────────
+  if (!reduced && !isTouch) {
+    const tiltables = () => document.querySelectorAll('.image-card, .stat-card, .hud-card, .btn-sample');
+    const applyTilt = (el, e) => {
+      const r = el.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      const max = el.classList.contains('image-card') ? 6 : 3;
+      el.style.transform = `perspective(700px) rotateX(${(-py * max).toFixed(2)}deg) rotateY(${(px * max).toFixed(2)}deg) translateY(-2px)`;
+    };
+    const resetTilt = (el) => { el.style.transform = ''; };
+
+    document.addEventListener('mousemove', (e) => {
+      if (!e.target.closest) return;
+      const el = e.target.closest('.image-card, .stat-card, .hud-card, .btn-sample');
+      if (el) applyTilt(el, e);
+    }, { passive: true });
+
+    document.addEventListener('mouseout', (e) => {
+      if (!e.target.closest) return;
+      const el = e.target.closest('.image-card, .stat-card, .hud-card, .btn-sample');
+      if (el) resetTilt(el);
+    }, { passive: true });
+  }
+
+  // ─── 4. Live System Clock ──────────────────────────────────────────────
+  function tickClocks() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const date = `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())}`;
+    const el = document.getElementById('sysClock');
+    if (el) {
+      el.querySelector('.t').textContent = time;
+      el.querySelector('.d').textContent = date;
+    }
+    const fc = document.getElementById('footerClock');
+    if (fc) {
+      fc.textContent = `${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())}`;
+    }
+  }
+  tickClocks();
+  setInterval(tickClocks, 1000);
 });

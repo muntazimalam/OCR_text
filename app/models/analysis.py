@@ -30,6 +30,7 @@ class AnalysisResult(Base):
     tampering_info = Column(JSON, nullable=True)
     metadata_info = Column(JSON, nullable=True)
     overall_score = Column(Float, nullable=True)
+    contrast_score = Column(Float, nullable=True)
     issues = Column(JSON, nullable=True)
     
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

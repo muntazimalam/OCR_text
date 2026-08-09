@@ -115,6 +115,29 @@ def get_image_results(image_id: uuid.UUID, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/stats", summary="Get pipeline statistics")
+def get_pipeline_stats(db: Session = Depends(get_db)):
+    from app.models.image import Image, ImageStatus
+    from app.models.analysis import AnalysisResult
+    from sqlalchemy import func
+
+    total = db.query(Image).count()
+    completed = db.query(Image).filter(Image.status == ImageStatus.COMPLETED).count()
+    failed = db.query(Image).filter(Image.status == ImageStatus.FAILED).count()
+    pending = db.query(Image).filter(Image.status.in_([ImageStatus.PENDING, ImageStatus.PROCESSING])).count()
+    avg_score = db.query(func.avg(AnalysisResult.overall_score)).scalar()
+
+    pass_rate = round(completed / total, 3) if total > 0 else 0.0
+    return {
+        "total": total,
+        "completed": completed,
+        "failed": failed,
+        "pending": pending,
+        "pass_rate": pass_rate,
+        "average_score": round(float(avg_score), 3) if avg_score is not None else None
+    }
+
+
 @router.get("/{image_id}/file", summary="Serve uploaded image file")
 def get_image_file(image_id: uuid.UUID, db: Session = Depends(get_db)):
     image = ImageService.get_image_by_id(db, image_id)

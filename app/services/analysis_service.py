@@ -169,6 +169,7 @@ class AnalysisService:
             "is_blurry": blur_res.get("is_blurry"),
             "brightness_score": brightness_res.get("score"),
             "brightness_status": brightness_res.get("status"),
+            "contrast_score": brightness_res.get("contrast_score"),
             "is_duplicate": duplicate_res.get("is_duplicate", False),
             "duplicate_of": duplicate_res.get("duplicate_of"),
             "ocr_text": ocr_res.get("text"),

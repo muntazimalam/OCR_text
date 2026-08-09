@@ -3,48 +3,80 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Intelligent Media Processing Pipeline</title>
+  <meta name="description" content="Intelligent media processing pipeline for vehicle image quality analysis, OCR license plate validation and tampering detection.">
+  <title>Media Processing Pipeline — Vehicle Analysis</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+  <!-- Toast Container -->
+  <div id="toast-container" aria-live="polite"></div>
+
   <div class="container">
     <header>
       <div class="logo-section">
-        <div class="logo-icon">🚗</div>
+        <div class="logo-icon" aria-hidden="true">🚗</div>
         <div>
           <h1>Media Processing Pipeline</h1>
-          <p class="subtitle">Vehicle Quality Analysis, OCR License Plate Validation & Tampering Detection</p>
+          <p class="subtitle">Vehicle Quality Analysis · OCR License Plate Validation · Tampering Detection</p>
         </div>
       </div>
       <div class="header-badges">
         <div class="badge-status">
-          <span class="indicator-dot"></span> API v1.0.0
+          <span class="indicator-dot" aria-label="API online"></span> API v1.0.0
         </div>
-        <a href="/docs" target="_blank" class="badge-status" style="text-decoration: none; color: inherit;">
-          📘 Swagger Docs
+        <a href="/docs" target="_blank" rel="noopener" class="badge-status" style="text-decoration: none; color: inherit;">
+          📘 Swagger
+        </a>
+        <a href="/api/v1/health" target="_blank" rel="noopener" class="badge-status" style="text-decoration: none; color: inherit;">
+          ❤️ Health
         </a>
       </div>
     </header>
 
+    <!-- Pipeline Statistics Banner -->
+    <div class="stats-banner" id="statsBanner" aria-label="Pipeline statistics">
+      <div class="stat-card" style="--stat-color: #94a3b8;">
+        <div class="stat-value skeleton" id="statTotal" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
+        <div class="stat-label">Total Processed</div>
+      </div>
+      <div class="stat-card" style="--stat-color: #10b981;">
+        <div class="stat-value skeleton" id="statCompleted" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
+        <div class="stat-label">Completed</div>
+      </div>
+      <div class="stat-card" style="--stat-color: #ef4444;">
+        <div class="stat-value skeleton" id="statFailed" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
+        <div class="stat-label">Failed</div>
+      </div>
+      <div class="stat-card" style="--stat-color: #f59e0b;">
+        <div class="stat-value skeleton" id="statPending" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
+        <div class="stat-label">In Queue</div>
+      </div>
+      <div class="stat-card" style="--stat-color: #3b82f6;">
+        <div class="stat-value skeleton" id="statPassRate" style="height:2.4rem; width:70%; border-radius:6px;">&nbsp;</div>
+        <div class="stat-label">Pass Rate</div>
+      </div>
+    </div>
+
     <main class="dashboard-grid">
       <!-- Upload Panel -->
-      <section class="card">
+      <section class="card" aria-label="Upload vehicle image">
         <div class="card-title">
-          <span>Upload & Analyze</span>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Asynchronous / Fallback</span>
+          <span>Upload &amp; Analyze</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight:400;">Async / Fallback</span>
         </div>
-        
-        <form id="uploadForm">
-          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display: none;">
-          <div class="drop-zone" id="dropZone">
+
+        <form id="uploadForm" aria-label="Image upload form">
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display: none;" aria-label="Select image file">
+          <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Drag and drop zone">
             <div id="dropZoneContent">
-              <div class="upload-icon">📁</div>
-              <p><strong>Drag & Drop vehicle image here</strong></p>
-              <p class="subtitle">Supports JPG, PNG, WEBP up to 10MB</p>
-              <button class="btn-upload" type="button" onclick="document.getElementById('fileInput').click()">Browse Files</button>
+              <span class="upload-icon" aria-hidden="true">📁</span>
+              <p><strong>Drag &amp; Drop vehicle image here</strong></p>
+              <p class="subtitle">Supports JPG, PNG, WEBP · Max 10MB</p>
+              <button class="btn-upload" type="button" id="browseBtn">
+                Browse Files
+              </button>
             </div>
           </div>
         </form>
@@ -52,55 +84,64 @@
         <div class="quick-samples">
           <div class="samples-label">⚡ One-Click Test Samples</div>
           <div class="samples-btns">
-            <button class="btn-sample" onclick="testSample('clean')">🟢 Clean Plate</button>
-            <button class="btn-sample" onclick="testSample('blurry')">🔴 Blurry Image</button>
-            <button class="btn-sample" onclick="testSample('dark')">🌙 Low Light</button>
-            <button class="btn-sample" onclick="testSample('screenshot')">📱 Screenshot</button>
+            <button class="btn-sample" id="sampleClean"    onclick="testSample('clean')">🟢 Clean Plate</button>
+            <button class="btn-sample" id="sampleBlurry"   onclick="testSample('blurry')">🔴 Blurry Image</button>
+            <button class="btn-sample" id="sampleDark"     onclick="testSample('dark')">🌙 Low Light</button>
+            <button class="btn-sample" id="sampleScreenshot" onclick="testSample('screenshot')">📱 Screenshot</button>
           </div>
         </div>
       </section>
 
       <!-- Media Gallery Panel -->
-      <section class="card">
+      <section class="card" aria-label="Processed media gallery">
         <div class="gallery-controls">
           <div class="card-title" style="margin: 0;">Processed Media Gallery</div>
-          <div class="filter-group">
-            <button class="filter-btn active" data-filter="all">All</button>
-            <button class="filter-btn" data-filter="completed">Completed</button>
-            <button class="filter-btn" data-filter="pending">Pending</button>
-            <button class="filter-btn" data-filter="failed">Failed</button>
+          <div class="filter-group" role="group" aria-label="Filter images by status">
+            <button class="filter-btn active" data-filter="all"       id="filterAll">All</button>
+            <button class="filter-btn"         data-filter="completed" id="filterCompleted">Completed</button>
+            <button class="filter-btn"         data-filter="pending"   id="filterPending">Pending</button>
+            <button class="filter-btn"         data-filter="failed"    id="filterFailed">Failed</button>
           </div>
         </div>
 
-        <div class="image-grid" id="imageGallery">
-          <p class="subtitle" style="grid-column: 1/-1; text-align: center; padding: 2rem;">Loading media gallery...</p>
+        <div class="image-grid" id="imageGallery" aria-live="polite" aria-label="Image gallery grid">
+          <!-- Skeleton loaders shown on initial load -->
+          <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line-sm"></div></div>
+          <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line-sm"></div></div>
+          <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line-sm"></div></div>
+          <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line-sm"></div></div>
         </div>
       </section>
     </main>
   </div>
 
   <!-- Inspection Modal -->
-  <div class="modal-overlay" id="inspectModal">
+  <div class="modal-overlay" id="inspectModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-container">
       <div class="modal-header">
         <h2 id="modalTitle">Inspection Report</h2>
-        <button class="close-btn" id="closeModal">&times;</button>
+        <button class="close-btn" id="closeModal" aria-label="Close inspection report">&times;</button>
       </div>
       <div class="modal-grid">
         <div>
-          <img src="" id="modalImage" class="modal-img-preview" alt="Vehicle Preview">
-          <div style="margin-top: 1rem; text-align: center;">
-            <span class="subtitle">Overall Quality & Authenticity Score</span>
-            <div id="scoreDisplay" style="font-size: 2rem; font-weight: 700; color: var(--accent-success);">100%</div>
+          <img src="" id="modalImage" class="modal-img-preview" alt="Vehicle inspection preview">
+          <div class="score-ring-container">
+            <svg class="score-ring-svg" width="90" height="90" viewBox="0 0 90 90" aria-hidden="true">
+              <circle class="score-ring-bg"   cx="45" cy="45" r="35"/>
+              <circle class="score-ring-fill" cx="45" cy="45" r="35" id="scoreRingFill"/>
+            </svg>
+            <div id="scoreDisplay" style="font-size:1.5rem; font-weight:800; color:var(--accent-success); margin-top:-60px; line-height:1; text-align:center;">—</div>
+            <div style="margin-top:50px;"></div>
+            <div class="score-ring-text">Overall Quality Score</div>
           </div>
         </div>
         <div>
-          <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Analysis Heuristics</h3>
+          <h3 style="font-size: 0.9rem; font-weight:700; margin-bottom: 0.65rem; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.05em;">Analysis Heuristics</h3>
           <div class="metrics-list" id="metricsContainer">
             <!-- Dynamic metrics injected by app.js -->
           </div>
 
-          <h3 style="font-size: 1rem; margin-top: 1.25rem; margin-bottom: 0.5rem;">Detected Issues</h3>
+          <h3 style="font-size: 0.9rem; font-weight:700; margin-top: 1.2rem; margin-bottom: 0.45rem; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.05em;">Detected Issues</h3>
           <div class="issues-list" id="issuesContainer">
             <!-- Dynamic issues injected by app.js -->
           </div>

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Intelligent media processing pipeline for vehicle image quality analysis, OCR license plate validation and tampering detection.">
-  <meta name="theme-color" content="#07090f">
+  <meta name="theme-color" content="#0b0d14">
   <title>Media Processing Pipeline — Vehicle Analysis</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,7 +38,7 @@
 
     <!-- Pipeline Statistics Banner -->
     <div class="stats-banner" id="statsBanner" aria-label="Pipeline statistics">
-      <div class="stat-card" style="--stat-color: #8b92b0;">
+      <div class="stat-card" style="--stat-color: #9ca3af;">
         <div class="stat-value skeleton" id="statTotal" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
         <div class="stat-label">Total Processed</div>
       </div>
@@ -54,7 +54,7 @@
         <div class="stat-value skeleton" id="statPending" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
         <div class="stat-label">In Queue</div>
       </div>
-      <div class="stat-card" style="--stat-color: #818cf8;">
+      <div class="stat-card" style="--stat-color: #a78bfa;">
         <div class="stat-value skeleton" id="statPassRate" style="height:2.4rem; width:70%; border-radius:6px;">&nbsp;</div>
         <div class="stat-label">Pass Rate</div>
       </div>
@@ -85,9 +85,9 @@
         <div class="quick-samples">
           <div class="samples-label">⚡ One-Click Test Samples</div>
           <div class="samples-btns">
-            <button class="btn-sample" id="sampleClean"    onclick="testSample('clean')">🟢 Clean Plate</button>
-            <button class="btn-sample" id="sampleBlurry"   onclick="testSample('blurry')">🔴 Blurry Image</button>
-            <button class="btn-sample" id="sampleDark"     onclick="testSample('dark')">🌙 Low Light</button>
+            <button class="btn-sample" id="sampleClean"      onclick="testSample('clean')">🟢 Clean Plate</button>
+            <button class="btn-sample" id="sampleBlurry"     onclick="testSample('blurry')">🔴 Blurry Image</button>
+            <button class="btn-sample" id="sampleDark"       onclick="testSample('dark')">🌙 Low Light</button>
             <button class="btn-sample" id="sampleScreenshot" onclick="testSample('screenshot')">📱 Screenshot</button>
           </div>
         </div>
@@ -126,23 +126,26 @@
       <div class="modal-grid">
         <div>
           <img src="" id="modalImage" class="modal-img-preview" alt="Vehicle inspection preview">
+          
+          <!-- Perfectly Centered Score Ring -->
           <div class="score-ring-container">
-            <svg class="score-ring-svg" width="100" height="100" viewBox="0 0 100 100" aria-hidden="true">
-              <circle class="score-ring-bg"   cx="50" cy="50" r="40"/>
-              <circle class="score-ring-fill" cx="50" cy="50" r="40" id="scoreRingFill"/>
-            </svg>
-            <div id="scoreDisplay" style="font-size:1.6rem; font-weight:800; color:var(--accent-success); margin-top:-66px; line-height:1; text-align:center;">—</div>
-            <div style="margin-top:52px;"></div>
+            <div class="score-ring-wrapper">
+              <svg class="score-ring-svg" width="110" height="110" viewBox="0 0 110 110" aria-hidden="true">
+                <circle class="score-ring-bg"   cx="55" cy="55" r="44"/>
+                <circle class="score-ring-fill" cx="55" cy="55" r="44" id="scoreRingFill"/>
+              </svg>
+              <div id="scoreDisplay">—</div>
+            </div>
             <div class="score-ring-text">Overall Quality Score</div>
           </div>
         </div>
         <div>
-          <h3 style="font-size: 0.85rem; font-weight:700; margin-bottom: 0.65rem; color: var(--accent-primary-light); text-transform: uppercase; letter-spacing: 0.08em;">Analysis Heuristics</h3>
+          <h3 style="font-size: 0.85rem; font-weight:700; margin-bottom: 0.65rem; color: var(--accent-violet); text-transform: uppercase; letter-spacing: 0.08em;">Analysis Heuristics</h3>
           <div class="metrics-list" id="metricsContainer">
             <!-- Dynamic metrics injected by app.js -->
           </div>
 
-          <h3 style="font-size: 0.85rem; font-weight:700; margin-top: 1.3rem; margin-bottom: 0.5rem; color: var(--accent-primary-light); text-transform: uppercase; letter-spacing: 0.08em;">Detected Issues</h3>
+          <h3 style="font-size: 0.85rem; font-weight:700; margin-top: 1.3rem; margin-bottom: 0.5rem; color: var(--accent-violet); text-transform: uppercase; letter-spacing: 0.08em;">Detected Issues</h3>
           <div class="issues-list" id="issuesContainer">
             <!-- Dynamic issues injected by app.js -->
           </div>

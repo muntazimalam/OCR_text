@@ -25,20 +25,22 @@ function animateScoreRing(pct) {
   const fill = document.getElementById('scoreRingFill');
   const display = document.getElementById('scoreDisplay');
   if (!fill) return;
-  const circumference = 2 * Math.PI * 40; // r=40 → ≈251.3
+  const circumference = 2 * Math.PI * 44; // r=44 → ≈276.46
   const offset = circumference - (pct / 100) * circumference;
   const color = pct >= 80 ? '#34d399' : pct >= 50 ? '#fbbf24' : '#f87171';
   fill.style.strokeDasharray = circumference;
   fill.style.strokeDashoffset = offset;
   fill.style.stroke = color;
-  display.style.color = color;
-  display.textContent = `${pct}%`;
+  if (display) {
+    display.style.color = color;
+    display.textContent = `${pct}%`;
+  }
 }
 
 function resetScoreRing(symbol = '—') {
   const fill = document.getElementById('scoreRingFill');
   const display = document.getElementById('scoreDisplay');
-  if (fill) { fill.style.strokeDashoffset = 251.3; fill.style.stroke = 'var(--accent-success)'; }
+  if (fill) { fill.style.strokeDashoffset = 276.46; fill.style.stroke = 'var(--accent-success)'; }
   if (display) { display.style.color = 'var(--text-subtle)'; display.textContent = symbol; }
 }
 
@@ -319,6 +321,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const contrastTxt = bright.contrast_score != null
         ? ` · Contrast: ${Math.round(bright.contrast_score)}` : '';
 
+      // Prominent License Plate text formatting
+      const recognizedPlateText = plate.plate_text || ocr.text || null;
+      const plateBadgeHtml = recognizedPlateText
+        ? `<span class="plate-badge-highlight">${recognizedPlateText}</span>`
+        : '';
+
+      const plateStatusHtml = plate.valid
+        ? `🟢 Valid ${plateBadgeHtml} (${plate.confidence ? Math.round(plate.confidence * 100) + '%' : '90%'})`
+        : '🔴 Not Detected';
+
+      const ocrSceneTextDisplay = recognizedPlateText
+        ? `${plateBadgeHtml} ${ocr.text && ocr.text !== recognizedPlateText ? `<span style="font-size:0.72rem; color:var(--text-muted);">(raw: ${ocr.text})</span>` : ''}`
+        : (ocr.text || 'None detected');
+
       metricsContainer.innerHTML = `
         <div class="metric-item">
           <span>Clarity / Blur</span>
@@ -330,13 +346,11 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="metric-item">
           <span>License Plate</span>
-          <strong>${plate.valid
-            ? `🟢 Valid (${plate.confidence ? Math.round(plate.confidence * 100) + '%' : '90%'})`
-            : '🔴 Not Detected'}</strong>
+          <strong>${plateStatusHtml}</strong>
         </div>
         <div class="metric-item">
           <span>OCR Scene Text</span>
-          <strong>${ocr.text || 'None detected'}</strong>
+          <strong>${ocrSceneTextDisplay}</strong>
         </div>
         <div class="metric-item">
           <span>Screenshot Probability</span>

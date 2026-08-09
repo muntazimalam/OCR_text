@@ -734,28 +734,6 @@ body::before {  /* bottom asphalt city glow */
 
 .image-card:hover .img-container img { transform: scale(1.09); filter: saturate(1.18) contrast(1.05); }
 
-/* Security scan sweep on hover */
-.img-container::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent 20%, rgba(0, 229, 255, 0.22) 50%, transparent 80%);
-  background-size: 100% 240%;
-  opacity: 0;
-  pointer-events: none;
-  mix-blend-mode: screen;
-}
-
-.image-card:hover .img-container::after {
-  opacity: 1;
-  animation: scanSweep 1.1s ease-in-out 3;
-}
-
-@keyframes scanSweep {
-  0% { background-position: 0 -120%; }
-  100% { background-position: 0 220%; }
-}
-
 /* corner brackets on image */
 .img-container::before {
   content: '';
@@ -1274,7 +1252,7 @@ body::before {  /* bottom asphalt city glow */
   }
 }
 /* -----------------------------------------------------------------------
-   ENHANCED FEATURES — plate badges, refresh, upload progress, a11y, polish
+   ENHANCED FEATURES ï¿½ plate badges, refresh, upload progress, a11y, polish
    ----------------------------------------------------------------------- */
 
 /* Plate text line on gallery cards */

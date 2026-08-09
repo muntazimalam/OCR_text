@@ -20,15 +20,6 @@ async def lifespan(app: FastAPI):
     # Auto-create tables if they don't exist
     try:
         Base.metadata.create_all(bind=engine)
-        # Migration check: Add contrast_score column if missing in pre-existing database
-        from sqlalchemy import text
-        with engine.connect() as conn:
-            try:
-                conn.execute(text("ALTER TABLE analysis_results ADD COLUMN contrast_score FLOAT"))
-                conn.commit()
-                logger.info("database_migration_added_contrast_score")
-            except Exception:
-                pass  # Column already exists
         logger.info("database_tables_initialized")
     except Exception as e:
         logger.error("database_init_error", error=str(e))

@@ -47,12 +47,24 @@ async def upload_image(
         sha256_hash=sha256_hash,
     )
     
+    celery_dispatched = False
     try:
-        process_image.delay(str(image_id))
+        from app.workers.celery_app import celery_app
+        import redis
+        r = redis.from_url(settings.REDIS_URL, socket_timeout=0.5)
+        if r.ping():
+            inspector = celery_app.control.inspect(timeout=0.5)
+            workers = inspector.ping() if inspector else None
+            if workers:
+                process_image.delay(str(image_id))
+                celery_dispatched = True
     except Exception as e:
-        logger.warning("celery_dispatch_failed_fallback_async", image_id=str(image_id), error=str(e))
+        logger.warning("celery_worker_check_failed", image_id=str(image_id), error=str(e))
+
+    if not celery_dispatched:
+        logger.info("dispatching_via_background_tasks", image_id=str(image_id))
         background_tasks.add_task(run_image_processing_standalone, str(image_id))
-    
+
     return image_record
 
 

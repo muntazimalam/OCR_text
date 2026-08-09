@@ -103,13 +103,16 @@ class NumberPlateAnalyzer(BaseAnalyzer):
         if full_text_cleaned:
             candidates.extend(normalize_indian_plate_candidate(full_text_cleaned))
 
+        # Deduplicate candidates preserving order
+        unique_candidates = list(dict.fromkeys(candidates))
+
         best_plate = None
         best_conf = 0.0
         best_format = None
         is_valid = False
 
         # Phase 1: Test against Specific Regional & Standard Patterns
-        for candidate in candidates:
+        for candidate in unique_candidates:
             for pattern, base_conf, fmt_name in SPECIFIC_PLATE_PATTERNS:
                 if pattern.match(candidate):
                     best_plate = candidate

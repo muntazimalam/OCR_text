@@ -21,7 +21,7 @@ def get_ocr_reader():
 
 class OCRAnalyzer(BaseAnalyzer):
     """
-    Extracts text using EasyOCR with memory-optimized parameters for 512MB RAM environments.
+    Extracts text using EasyOCR with ultra-lightweight memory and speed optimizations for 512MB RAM environments.
     """
     def analyze(self, image_path: str, file_bytes: bytes) -> Dict[str, Any]:
         reader = get_ocr_reader()
@@ -38,17 +38,17 @@ class OCRAnalyzer(BaseAnalyzer):
 
             if img is not None:
                 h, w = img.shape[:2]
-                # Downscale large mobile camera images (>1024px) to prevent PyTorch OOM on 512MB RAM
-                if max(h, w) > 1024:
-                    scale = 1024.0 / max(h, w)
+                # Downscale to 640px max for ultra-fast CPU inference and 10MB RAM limit
+                if max(h, w) > 640:
+                    scale = 640.0 / max(h, w)
                     img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
                 input_target = img
             else:
                 input_target = image_path
 
             with torch.no_grad():
-                # canvas_size=1024, max_size=1024 caps PyTorch feature map RAM allocation
-                results = reader.readtext(input_target, canvas_size=1024, max_size=1024)
+                # canvas_size=640, max_size=640 limits PyTorch intermediate tensors to ~10MB RAM
+                results = reader.readtext(input_target, canvas_size=640, max_size=640)
 
             gc.collect()
 

@@ -8,7 +8,7 @@ class PhotoOfPhotoAnalyzer(BaseAnalyzer):
     """
     Detects heuristics of a photo taken of a digital screen or printed photograph.
     Combines 2D FFT (Fast Fourier Transform) frequency domain Moiré pattern detection
-    with EXIF camera indicators.
+    with EXIF camera indicators. Memory-optimized for 512MB RAM environments.
     """
     def analyze(self, image_path: str, file_bytes: bytes, metadata_result: Dict[str, Any] = None) -> Dict[str, Any]:
         is_photo_of_photo = False
@@ -20,15 +20,22 @@ class PhotoOfPhotoAnalyzer(BaseAnalyzer):
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             if img is not None:
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                # Compute 2D Fast Fourier Transform
+                h, w = gray.shape[:2]
+
+                # Downscale to 512x512 max before 2D FFT to limit RAM to 4MB (vs 570MB on 12MP)
+                if max(h, w) > 512:
+                    scale = 512.0 / max(h, w)
+                    gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
+                # Compute 2D Fast Fourier Transform on lightweight 512px image
                 f = np.fft.fft2(gray)
                 fshift = np.fft.fftshift(f)
                 magnitude = 20 * np.log(np.abs(fshift) + 1e-8)
 
                 # Analyze high-frequency energy ratio outside central low-frequency area
-                h, w = gray.shape
-                cy, cx = h // 2, w // 2
-                r = min(h, w) // 10
+                h_s, w_s = gray.shape
+                cy, cx = h_s // 2, w_s // 2
+                r = min(h_s, w_s) // 10
                 
                 # Zero out low frequencies around center
                 magnitude_high_freq = np.copy(magnitude)
@@ -36,7 +43,7 @@ class PhotoOfPhotoAnalyzer(BaseAnalyzer):
 
                 # Ratio of high-frequency periodic peak energy to total magnitude
                 high_energy_peaks = float(np.sum(magnitude_high_freq > (magnitude.mean() * 2.5)))
-                total_pixels = h * w
+                total_pixels = h_s * w_s
                 moire_ratio = round(high_energy_peaks / total_pixels, 4)
 
                 # Moiré grid frequency threshold

@@ -7,17 +7,7 @@ from app.analyzers.base import BaseAnalyzer
 class BrightnessAnalyzer(BaseAnalyzer):
     """
     Calculates mean grayscale intensity (brightness) and standard deviation (contrast).
-    Brightness heuristics:
-      0-40  : very_dark
-      40-80 : low_light
-      80-180: acceptable
-      180-220: bright
-      220+  : overexposed
-    Contrast heuristics (std dev of pixel values):
-      < 20  : very_low (flat / no detail)
-      20-50 : low
-      50-80 : acceptable
-      > 80  : high
+    Memory-optimized for 512MB RAM environments.
     """
     def analyze(self, image_path: str, file_bytes: bytes) -> Dict[str, Any]:
         nparr = np.frombuffer(file_bytes, np.uint8)
@@ -26,6 +16,12 @@ class BrightnessAnalyzer(BaseAnalyzer):
             return {"score": 0.0, "status": "unknown", "contrast_score": 0.0, "contrast_status": "unknown", "error": "Image decode failed"}
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        h, w = gray.shape[:2]
+
+        if max(h, w) > 512:
+            scale = 512.0 / max(h, w)
+            gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
         brightness = float(gray.mean())
         contrast = float(gray.std())
 

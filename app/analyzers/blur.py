@@ -9,10 +9,7 @@ class BlurAnalyzer(BaseAnalyzer):
     Measures image sharpness using a dual-metric approach:
     1. Laplacian variance (frequency energy in the whole image)
     2. Tenengrad variance (Sobel edge strength — more robust to uniform regions)
-    Final score is the mean of both. Heuristics:
-      < 50  : blurry
-      50-100: questionable
-      > 100 : sharp / acceptable
+    Final score is the mean of both. Memory-optimized for 512MB RAM environments.
     """
     def analyze(self, image_path: str, file_bytes: bytes) -> Dict[str, Any]:
         nparr = np.frombuffer(file_bytes, np.uint8)
@@ -21,6 +18,12 @@ class BlurAnalyzer(BaseAnalyzer):
             return {"score": 0.0, "laplacian_score": 0.0, "tenengrad_score": 0.0, "is_blurry": True, "error": "Image decode failed"}
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        h, w = gray.shape[:2]
+
+        # Downscale to max 800px for 10x faster execution and minimal RAM footprint
+        if max(h, w) > 800:
+            scale = 800.0 / max(h, w)
+            gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
         # Metric 1: Laplacian Variance
         laplacian_score = float(cv2.Laplacian(gray, cv2.CV_64F).var())

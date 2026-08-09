@@ -349,8 +349,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       issuesContainer.innerHTML = '';
       if (data.status === 'failed') {
-        issuesContainer.innerHTML += `<div class="issue-chip issue-high">
-          🔴 <strong>Processing Failed</strong>: ${data.error_message || 'Validation checks failed.'}</div>`;
+        issuesContainer.innerHTML += `<div class="issue-chip issue-high" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+          <div>🔴 <strong>Processing Failed</strong>: ${data.error_message || 'Validation checks failed.'}</div>
+          <button id="reanalyzeBtn" class="btn-upload" style="padding:0.3rem 0.8rem; font-size:0.85rem;">🔄 Re-analyze</button>
+        </div>`;
+      } else {
+        issuesContainer.innerHTML += `<div style="text-align:right; margin-bottom:0.5rem;">
+          <button id="reanalyzeBtn" class="btn-upload" style="padding:0.3rem 0.8rem; font-size:0.85rem; background:var(--bg-card); border:1px solid var(--border-glow);">🔄 Re-analyze Image</button>
+        </div>`;
       }
 
       if (data.issues?.length > 0) {
@@ -360,8 +366,22 @@ document.addEventListener('DOMContentLoaded', () => {
             ⚠️ <strong>${issue.type}</strong>: ${issue.description}</div>`;
         });
       } else if (data.status === 'completed') {
-        issuesContainer.innerHTML = `<div class="issue-chip issue-low">🟢 No quality or authenticity issues detected.</div>`;
+        issuesContainer.innerHTML += `<div class="issue-chip issue-low">🟢 No quality or authenticity issues detected.</div>`;
       }
+
+      document.getElementById('reanalyzeBtn')?.addEventListener('click', async () => {
+        try {
+          showToast('Re-triggering analysis pipeline...', 'info');
+          const r = await fetch(`/api/v1/images/${imageId}/reanalyze`, { method: 'POST' });
+          if (!r.ok) throw new Error('Failed to start re-analysis');
+          showToast('Analysis restarted!', 'success');
+          inspectImage(imageId);
+          loadGallery();
+          loadStats();
+        } catch (e) {
+          showToast(e.message, 'error');
+        }
+      });
 
     } catch (err) {
       stopModalPolling();

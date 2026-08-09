@@ -127,6 +127,23 @@ def get_image_results(image_id: uuid.UUID, db: Session = Depends(get_db)):
     )
 
 
+@router.post("/{image_id}/reanalyze", summary="Re-trigger image analysis pipeline")
+def reanalyze_image(
+    image_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    image = ImageService.get_image_by_id(db, image_id)
+    if not image:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Image with ID '{image_id}' not found"
+        )
+    ImageService.update_image_status(db, image_id, ImageStatus.PENDING, error_message=None)
+    background_tasks.add_task(run_image_processing_standalone, str(image_id))
+    return {"status": "reanalyzing", "image_id": str(image_id)}
+
+
 @router.get("/stats", summary="Get pipeline statistics")
 def get_pipeline_stats(db: Session = Depends(get_db)):
     from app.models.image import Image, ImageStatus

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Intelligent media processing pipeline for vehicle image quality analysis, OCR license plate validation and tampering detection.">
+  <meta name="theme-color" content="#07090f">
   <title>Media Processing Pipeline — Vehicle Analysis</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,23 +38,23 @@
 
     <!-- Pipeline Statistics Banner -->
     <div class="stats-banner" id="statsBanner" aria-label="Pipeline statistics">
-      <div class="stat-card" style="--stat-color: #94a3b8;">
+      <div class="stat-card" style="--stat-color: #8b92b0;">
         <div class="stat-value skeleton" id="statTotal" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
         <div class="stat-label">Total Processed</div>
       </div>
-      <div class="stat-card" style="--stat-color: #10b981;">
+      <div class="stat-card" style="--stat-color: #34d399;">
         <div class="stat-value skeleton" id="statCompleted" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
         <div class="stat-label">Completed</div>
       </div>
-      <div class="stat-card" style="--stat-color: #ef4444;">
+      <div class="stat-card" style="--stat-color: #f87171;">
         <div class="stat-value skeleton" id="statFailed" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
         <div class="stat-label">Failed</div>
       </div>
-      <div class="stat-card" style="--stat-color: #f59e0b;">
+      <div class="stat-card" style="--stat-color: #fbbf24;">
         <div class="stat-value skeleton" id="statPending" style="height:2.4rem; width:60%; border-radius:6px;">&nbsp;</div>
         <div class="stat-label">In Queue</div>
       </div>
-      <div class="stat-card" style="--stat-color: #3b82f6;">
+      <div class="stat-card" style="--stat-color: #818cf8;">
         <div class="stat-value skeleton" id="statPassRate" style="height:2.4rem; width:70%; border-radius:6px;">&nbsp;</div>
         <div class="stat-label">Pass Rate</div>
       </div>
@@ -64,7 +65,7 @@
       <section class="card" aria-label="Upload vehicle image">
         <div class="card-title">
           <span>Upload &amp; Analyze</span>
-          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight:400;">Async / Fallback</span>
+          <span style="font-size: 0.72rem; color: var(--text-muted); font-weight:400; font-family: var(--font-mono);">Async</span>
         </div>
 
         <form id="uploadForm" aria-label="Image upload form">
@@ -126,22 +127,22 @@
         <div>
           <img src="" id="modalImage" class="modal-img-preview" alt="Vehicle inspection preview">
           <div class="score-ring-container">
-            <svg class="score-ring-svg" width="90" height="90" viewBox="0 0 90 90" aria-hidden="true">
-              <circle class="score-ring-bg"   cx="45" cy="45" r="35"/>
-              <circle class="score-ring-fill" cx="45" cy="45" r="35" id="scoreRingFill"/>
+            <svg class="score-ring-svg" width="100" height="100" viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="score-ring-bg"   cx="50" cy="50" r="40"/>
+              <circle class="score-ring-fill" cx="50" cy="50" r="40" id="scoreRingFill"/>
             </svg>
-            <div id="scoreDisplay" style="font-size:1.5rem; font-weight:800; color:var(--accent-success); margin-top:-60px; line-height:1; text-align:center;">—</div>
-            <div style="margin-top:50px;"></div>
+            <div id="scoreDisplay" style="font-size:1.6rem; font-weight:800; color:var(--accent-success); margin-top:-66px; line-height:1; text-align:center;">—</div>
+            <div style="margin-top:52px;"></div>
             <div class="score-ring-text">Overall Quality Score</div>
           </div>
         </div>
         <div>
-          <h3 style="font-size: 0.9rem; font-weight:700; margin-bottom: 0.65rem; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.05em;">Analysis Heuristics</h3>
+          <h3 style="font-size: 0.85rem; font-weight:700; margin-bottom: 0.65rem; color: var(--accent-primary-light); text-transform: uppercase; letter-spacing: 0.08em;">Analysis Heuristics</h3>
           <div class="metrics-list" id="metricsContainer">
             <!-- Dynamic metrics injected by app.js -->
           </div>
 
-          <h3 style="font-size: 0.9rem; font-weight:700; margin-top: 1.2rem; margin-bottom: 0.45rem; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.05em;">Detected Issues</h3>
+          <h3 style="font-size: 0.85rem; font-weight:700; margin-top: 1.3rem; margin-bottom: 0.5rem; color: var(--accent-primary-light); text-transform: uppercase; letter-spacing: 0.08em;">Detected Issues</h3>
           <div class="issues-list" id="issuesContainer">
             <!-- Dynamic issues injected by app.js -->
           </div>

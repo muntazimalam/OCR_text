@@ -25,9 +25,9 @@ function animateScoreRing(pct) {
   const fill = document.getElementById('scoreRingFill');
   const display = document.getElementById('scoreDisplay');
   if (!fill) return;
-  const circumference = 2 * Math.PI * 35; // r=35 → ≈219.9
+  const circumference = 2 * Math.PI * 40; // r=40 → ≈251.3
   const offset = circumference - (pct / 100) * circumference;
-  const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+  const color = pct >= 80 ? '#34d399' : pct >= 50 ? '#fbbf24' : '#f87171';
   fill.style.strokeDasharray = circumference;
   fill.style.strokeDashoffset = offset;
   fill.style.stroke = color;
@@ -38,7 +38,7 @@ function animateScoreRing(pct) {
 function resetScoreRing(symbol = '—') {
   const fill = document.getElementById('scoreRingFill');
   const display = document.getElementById('scoreDisplay');
-  if (fill) { fill.style.strokeDashoffset = 220; fill.style.stroke = 'var(--accent-success)'; }
+  if (fill) { fill.style.strokeDashoffset = 251.3; fill.style.stroke = 'var(--accent-success)'; }
   if (display) { display.style.color = 'var(--text-subtle)'; display.textContent = symbol; }
 }
 

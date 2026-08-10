@@ -5,11 +5,12 @@ import cv2
 import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
 from app.analyzers.base import BaseAnalyzer
+from app.analyzers.number_plate import NumberPlateAnalyzer
 from app.core.logging import logger
 
 _OCR_ENGINE = None
 
-_MAX_CROP_OCR_CALLS = 8
+_MAX_CROP_OCR_CALLS = 4
 
 
 def _get_ocr_engine():
@@ -43,7 +44,21 @@ def _get_ocr_engine():
         from rapidocr_onnxruntime import RapidOCR
         # Models are bundled inside the pip package (~13MB), no download needed.
         # Session options already disable the memory arena for low-RAM hosts.
-        _OCR_ENGINE = RapidOCR()
+        # rec/cls batch sizes default to 6; halving them shrinks the largest
+        # inference workspace on text-dense images (~40MB saved) with negligible
+        # accuracy impact since the pipeline calls the engine per-crop anyway.
+        # max_candidates bounds the det postprocessor output arrays.
+        # NOTE: rapidocr 1.2.3's UpdateParameters raises KeyError('model_path')
+        # when ANY det_/rec_/cls_ kwarg is passed without model_path — the None
+        # placeholders make it fall back to the bundled config's model paths.
+        _OCR_ENGINE = RapidOCR(
+            det_model_path=None,
+            rec_model_path=None,
+            cls_model_path=None,
+            rec_batch_num=2,
+            cls_batch_num=2,
+            det_max_candidates=200,
+        )
         logger.info("rapidocr_loaded")
     except Exception as e:
         logger.warning("rapidocr_init_failed", error=str(e))
@@ -101,18 +116,19 @@ def _crop_and_enhance_patch(img_bgr: np.ndarray, roi: Tuple[int, int, int, int])
 
     target_h = 160
     scale = max(target_h / float(patch.shape[0]), 2.0)
-    # Cap upscaled patch size to bound RAM usage (large ROIs would otherwise balloon)
+    # Cap upscaled patch size to bound RAM usage (large ROIs would otherwise
+    # balloon — measured 504MB peak on a 512MB instance with 900px patches).
     max_dim = float(max(patch.shape[:2]))
-    if max_dim * scale > 900:
-        scale = 900.0 / max_dim
+    if max_dim * scale > 480:
+        scale = 480.0 / max_dim
     patch_up = cv2.resize(patch, (int(patch.shape[1] * scale), int(patch.shape[0] * scale)), interpolation=cv2.INTER_CUBIC)
 
-    lab = cv2.cvtColor(patch_up, cv2.COLOR_BGR2LAB)
-    l_ch, a_ch, b_ch = cv2.split(lab)
+    # CLAHE on a single gray channel (3x less memory than LAB split/merge);
+    # RapidOCR converts to grayscale internally anyway.
+    gray = cv2.cvtColor(patch_up, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
-    l_ch = clahe.apply(l_ch)
-    patch_enhanced = cv2.cvtColor(cv2.merge((l_ch, a_ch, b_ch)), cv2.COLOR_LAB2BGR)
-    return patch_enhanced
+    gray = clahe.apply(gray)
+    return gray
 
 
 def _tesseract_extract(img_bgr: np.ndarray) -> Optional[Dict[str, Any]]:
@@ -244,10 +260,14 @@ class OCRAnalyzer(BaseAnalyzer):
 
             h, w = img.shape[:2]
             # Moderate resolution for OCR — big enough for plates, small enough
-            # to stay inside 512 MB RAM instances.
-            if max(h, w) > 1600:
-                scale = 1600.0 / max(h, w)
+            # to stay inside 512 MB RAM instances. The det preprocessor works
+            # on the full-resolution input (measured: 1600px input peaks ~420MB
+            # during inference, ~245MB at 1000px), so the cap matters a lot.
+            if max(h, w) > 1000:
+                scale = 1000.0 / max(h, w)
                 img_work = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+                del img
+                gc.collect()
             else:
                 img_work = img
 
@@ -256,16 +276,22 @@ class OCRAnalyzer(BaseAnalyzer):
                 # 1. Full-image OCR
                 full_result = _run_engine(engine, img_work, min_chars=2, with_boxes=True)
 
-                # 2. Candidate plate ROIs (bounded to keep runtime + RAM low)
+                # 2. Candidate plate ROIs — only when the full-image pass did
+                #    not already yield a valid plate. Each crop costs a fresh
+                #    ONNX inference pass (measured: ~+150MB peak on a 512MB
+                #    instance), so a cheap regex verdict decides instead of
+                #    always paying for the crops.
                 crop_results: List[Dict[str, Any]] = []
-                plate_rois = _locate_plate_rois(img_work, top_n=_MAX_CROP_OCR_CALLS)
+                plate_probe = NumberPlateAnalyzer().analyze(image_path, file_bytes, ocr_result=full_result) if full_result else {"valid": False}
+                if not plate_probe.get("valid"):
+                    plate_rois = _locate_plate_rois(img_work, top_n=_MAX_CROP_OCR_CALLS)
 
-                for roi in plate_rois:
-                    patch = _crop_and_enhance_patch(img_work, roi)
-                    if patch is not None:
-                        c_res = _run_engine(engine, patch, min_chars=2, with_boxes=False)
-                        if c_res:
-                            crop_results.append(c_res)
+                    for roi in plate_rois:
+                        patch = _crop_and_enhance_patch(img_work, roi)
+                        if patch is not None:
+                            c_res = _run_engine(engine, patch, min_chars=2, with_boxes=False)
+                            if c_res:
+                                crop_results.append(c_res)
 
                 combined = _merge_ocr_results(full_result, *crop_results)
                 if combined.get("text"):

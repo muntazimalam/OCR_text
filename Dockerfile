@@ -2,6 +2,11 @@ FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+# Single-threaded inference + bounded glibc malloc arenas keep the 512MB free
+# instance from ballooning RSS during OCR (ONNX/OpenCV thread workspaces).
+ENV OMP_NUM_THREADS=1
+ENV OMP_WAIT_POLICY=PASSIVE
+ENV MALLOC_ARENA_MAX=2
 
 WORKDIR /app
 

@@ -17,3 +17,9 @@ services:
         value: "8000"
       - key: OCR_ENGINE
         value: "auto"
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: OMP_WAIT_POLICY
+        value: "PASSIVE"
+      - key: MALLOC_ARENA_MAX
+        value: "2"

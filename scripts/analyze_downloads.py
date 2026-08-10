@@ -41,11 +41,12 @@ def main():
         plate = PLATE.analyze(path, fbytes, ocr_result=ocr)
         h_img, w_img = img.shape[:2]
 
-        # yellow ROI info from OCR module internals for reporting
+        # plate ROI info from OCR module internals for reporting
         roi = None
         try:
             from app.analyzers import ocr as ocr_mod
-            roi = ocr_mod._locate_yellow_plate_roi(img)
+            rois = ocr_mod._locate_plate_rois(img, top_n=1)
+            roi = rois[0] if rois else None
         except Exception:
             roi = None
 

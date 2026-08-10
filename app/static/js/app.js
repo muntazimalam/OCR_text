@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     target.innerHTML = `
       <span class="upload-icon" aria-hidden="true">📡</span>
       <p><strong>Drag vehicle image into scan zone</strong></p>
-      <p class="subtitle">JPG · PNG · WEBP — 15MB</p>
+      <p class="subtitle">JPG · PNG · WEBP — 10MB</p>
       <button class="btn-upload" type="button" id="browseBtn">Browse Files</button>
     `;
     const bb = document.getElementById('browseBtn');

@@ -9,12 +9,13 @@ import numpy as np
 
 import app.analyzers.ocr as ocr_mod
 
-reader = ocr_mod._get_easyocr_reader()
+reader = ocr_mod._get_ocr_engine()
 INPUT_DIR = r"C:\Users\munta\Downloads\regingermediagroupvirtualpreplacementtalk8augu"
 
 
 def all_yellow_regions(img):
-    mask = ocr_mod._yellow_mask(img)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, (14, 35, 55), (45, 255, 255))
     h, w = img.shape[:2]
     cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     out = []
@@ -29,6 +30,13 @@ def all_yellow_regions(img):
     return out
 
 
+def is_plate_like(text):
+    txt = "".join(c for c in text if c.isalnum()).upper()
+    alpha = sum(1 for c in txt if c.isalpha())
+    digit = sum(1 for c in txt if c.isdigit())
+    return alpha >= 2 and digit >= 2
+
+
 def main():
     for path in sorted(glob.glob(os.path.join(INPUT_DIR, "*"))):
         fname = os.path.basename(path)
@@ -39,12 +47,12 @@ def main():
         for (x, y, w, h, aspect, frac) in regions:
             if h < 12 or w < 30 or frac < 0.0003:
                 continue
-            patch = ocr_mod._crop_plate_patch(img, (x, y, w, h))
+            patch = ocr_mod._crop_and_enhance_patch(img, (x, y, w, h))
             if patch is None:
                 continue
-            res = ocr_mod._run_easyocr(reader, patch, min_chars=2)
+            res = ocr_mod._run_engine(reader, patch, min_chars=2)
             text = (res or {}).get("text", "")
-            plate_like = ocr_mod._is_plate_like(text or "")
+            plate_like = is_plate_like(text or "")
             n_shown += 1
             print(f"  [{aspect:.1f}ar frac={frac:.4f} {w}x{h}@{x},{y}] {'PLATE!' if plate_like else '      '} {text[:70]}")
             if n_shown >= 14:

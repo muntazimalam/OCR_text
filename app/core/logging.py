@@ -1,5 +1,6 @@
 import logging
 import sys
+# pyrefly: ignore [missing-import]
 import structlog
 from app.core.config import settings
 

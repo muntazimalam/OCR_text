@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
     tesseract-ocr \
     tesseract-ocr-eng \
     curl \
@@ -19,6 +22,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-download RapidOCR ONNX models (~15MB) so workers never download at runtime
+RUN python -c "from rapidocr_onnxruntime import RapidOCR; RapidOCR(intra_op_num_threads=2)" || true
 
 COPY . .
 

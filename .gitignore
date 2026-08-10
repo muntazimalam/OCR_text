@@ -21,3 +21,6 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime uploads (keep tracked samples only)
+uploads/20*/

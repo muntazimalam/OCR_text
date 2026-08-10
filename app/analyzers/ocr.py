@@ -4,60 +4,52 @@ import re
 import cv2
 import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
-from PIL import Image, ImageDraw, ImageFont
 from app.analyzers.base import BaseAnalyzer
 from app.core.logging import logger
 
-_CHAR_TEMPLATES = None
-_easyocr_reader = None
-
-# HSV bounds for yellow/amber commercial license plates (India yellow plates,
-# EU yellow rear plates, taxi plates). Tolerances widened for shadows/compression.
-_YELLOW_HSV_LO = (14, 35, 55)
-_YELLOW_HSV_MID = (45, 35, 55)
-_YELLOW_HSV_HI = (62, 255, 255)
+_OCR_ENGINE = None
 
 _MAX_CROP_OCR_CALLS = 8
 
 
-def _easyocr_allowed() -> bool:
-    """Decides whether EasyOCR (torch) may be loaded.
+def _get_ocr_engine():
+    """Lazily loads the lightweight RapidOCR (ONNX PP-OCRv4) engine.
 
-    OCR_ENGINE env: 'tesseract' (lightweight, forced), 'easyocr' (forced),
-    or 'auto' (default) — auto requires at least ~1.2 GB free memory,
-    since torch crashes on small instances (e.g. Render free tier).
+    OCR_ENGINE env: 'tesseract' (forced lightweight fallback), 'rapidocr' (forced),
+    or 'auto' (default) — auto prefers RapidOCR when importable.
+
+    RapidOCR uses ~15 MB of ONNX models and no PyTorch, so it loads a small
+    fraction of EasyOCR's RAM/disk footprint and keeps 512 MB instances safe
+    while staying significantly more accurate than Tesseract.
     """
-    engine = os.getenv("OCR_ENGINE", "auto").strip().lower()
-    if engine == "tesseract":
-        return False
-    if engine == "easyocr":
-        return True
-    try:
-        with open("/proc/meminfo") as f:
-            for line in f:
-                if line.startswith("MemAvailable:"):
-                    return int(line.split()[1]) > 1_200_000
-    except Exception:
-        pass
-    try:
-        return os.sysconf("SC_AVAILABLE_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") > 1.2e9
-    except Exception:
-        return True
+    global _OCR_ENGINE
+    if _OCR_ENGINE is not None:
+        return _OCR_ENGINE or None
 
-
-def _get_easyocr_reader():
-    global _easyocr_reader
-    if _easyocr_reader is not None:
-        return _easyocr_reader
-    if not _easyocr_allowed():
+    choice = os.getenv("OCR_ENGINE", "auto").strip().lower()
+    if choice == "tesseract":
+        _OCR_ENGINE = False
         return None
+
+    if choice == "auto":
+        try:
+            import rapidocr_onnxruntime  # noqa: F401
+        except Exception:
+            logger.warning("rapidocr_unavailable", error="rapidocr_onnxruntime not installed")
+            _OCR_ENGINE = False
+            return None
+
     try:
-        import easyocr
-        _easyocr_reader = easyocr.Reader(['en'], gpu=False)
-        return _easyocr_reader
+        from rapidocr_onnxruntime import RapidOCR
+        try:
+            _OCR_ENGINE = RapidOCR(intra_op_num_threads=2)
+        except TypeError:
+            _OCR_ENGINE = RapidOCR()
+        logger.info("rapidocr_loaded")
     except Exception as e:
-        logger.warning("easyocr_init_failed", error=str(e))
-        return None
+        logger.warning("rapidocr_init_failed", error=str(e))
+        _OCR_ENGINE = False
+    return _OCR_ENGINE or None
 
 
 def _locate_plate_rois(img_bgr: np.ndarray, top_n: int = 6) -> List[Tuple[int, int, int, int]]:
@@ -110,6 +102,10 @@ def _crop_and_enhance_patch(img_bgr: np.ndarray, roi: Tuple[int, int, int, int])
 
     target_h = 160
     scale = max(target_h / float(patch.shape[0]), 2.0)
+    # Cap upscaled patch size to bound RAM usage (large ROIs would otherwise balloon)
+    max_dim = float(max(patch.shape[:2]))
+    if max_dim * scale > 900:
+        scale = 900.0 / max_dim
     patch_up = cv2.resize(patch, (int(patch.shape[1] * scale), int(patch.shape[0] * scale)), interpolation=cv2.INTER_CUBIC)
 
     lab = cv2.cvtColor(patch_up, cv2.COLOR_BGR2LAB)
@@ -121,7 +117,7 @@ def _crop_and_enhance_patch(img_bgr: np.ndarray, roi: Tuple[int, int, int, int])
 
 
 def _tesseract_extract(img_bgr: np.ndarray) -> Optional[Dict[str, Any]]:
-    """Tesseract OCR fallback used when EasyOCR models are unavailable."""
+    """Tesseract OCR fallback used when the RapidOCR engine is unavailable."""
     try:
         import pytesseract
         from PIL import Image as PILImage
@@ -164,42 +160,46 @@ def _tesseract_extract(img_bgr: np.ndarray) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _run_easyocr(
-    reader,
+def _run_engine(
+    engine,
     img_bgr: np.ndarray,
     min_chars: int = 2,
     with_boxes: bool = False,
 ) -> Optional[Dict[str, Any]]:
-    """Runs EasyOCR on an image and returns normalized detections (or None)."""
+    """Runs RapidOCR on an image and returns normalized detections (or None)."""
     try:
-        results = reader.readtext(img_bgr)
-        detections = []
-        for res in results:
-            if len(res) >= 3:
-                quad, text, conf = res[:3]
-                text_str = str(text).strip().upper()
-                cleaned_str = re.sub(r'[^A-Z0-9]', '', text_str)
-                if len(cleaned_str) < min_chars:
-                    continue
-                det = {"text": cleaned_str, "confidence": float(conf)}
-                if with_boxes and quad is not None and len(quad) > 0:
-                    xs = [pt[0] for pt in quad if len(pt) >= 2]
-                    ys = [pt[1] for pt in quad if len(pt) >= 2]
-                    if xs and ys:
-                        x0, y0 = float(min(xs)), float(min(ys))
-                        x1, y1 = float(max(xs)), float(max(ys))
-                        det["box"] = (int(x0), int(y0), int(max(x1 - x0, 1)), int(max(y1 - y0, 1)))
-                detections.append(det)
-        if detections:
-            confs = [d["confidence"] for d in detections]
-            return {
-                "text": " ".join(d["text"] for d in detections),
-                "confidence": round(sum(confs) / len(confs), 2),
-                "detections": detections,
-            }
-        return None
+        raw = engine(img_bgr)
+        results = raw[0] if isinstance(raw, tuple) else raw
+        detections: List[Dict[str, Any]] = []
+        for item in results or []:
+            if not isinstance(item, (list, tuple)) or len(item) < 3:
+                continue
+            box, text, score = item[:3]
+            text_str = str(text).strip().upper()
+            cleaned_str = re.sub(r'[^A-Z0-9]', '', text_str)
+            if len(cleaned_str) < min_chars:
+                continue
+            det = {"text": cleaned_str, "confidence": float(score)}
+            if with_boxes and box is not None:
+                try:
+                    xs = [pt[0] for pt in box]
+                    ys = [pt[1] for pt in box]
+                    x0, y0 = min(xs), min(ys)
+                    x1, y1 = max(xs), max(ys)
+                    det["box"] = (int(x0), int(y0), int(max(x1 - x0, 1)), int(max(y1 - y0, 1)))
+                except Exception:
+                    pass
+            detections.append(det)
+        if not detections:
+            return None
+        confs = [d["confidence"] for d in detections if d.get("confidence") is not None]
+        return {
+            "text": " ".join(d["text"] for d in detections),
+            "confidence": round(sum(confs) / len(confs), 2) if confs else 0.0,
+            "detections": detections,
+        }
     except Exception as e:
-        logger.warning("easyocr_execution_failed", error=str(e))
+        logger.warning("ocr_engine_execution_failed", error=str(e))
         return None
 
 
@@ -233,6 +233,7 @@ class OCRAnalyzer(BaseAnalyzer):
     Universal High-Accuracy License Plate OCR Engine:
     Processes full image at high resolution + crops candidate plate ROIs (white, yellow, green, silver)
     for maximum recognition accuracy across cars, motorcycles, scooters, and trucks.
+    Uses RapidOCR (PP-OCRv4 ONNX) when available and falls back to Tesseract.
     """
     def analyze(self, image_path: str, file_bytes: bytes) -> Dict[str, Any]:
         try:
@@ -243,37 +244,41 @@ class OCRAnalyzer(BaseAnalyzer):
                 return {"text": None, "confidence": None, "error": "Image decode failed"}
 
             h, w = img.shape[:2]
-            # Maintain high resolution for OCR (up to 1920px max dimension)
-            if max(h, w) > 1920:
-                scale = 1920.0 / max(h, w)
+            # Moderate resolution for OCR — big enough for plates, small enough
+            # to stay inside 512 MB RAM instances.
+            if max(h, w) > 1600:
+                scale = 1600.0 / max(h, w)
                 img_work = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
             else:
                 img_work = img
 
-            reader = _get_easyocr_reader()
-            if reader is None:
-                tess_result = _tesseract_extract(img_work)
-                if tess_result:
-                    return tess_result
-                return {"text": "", "confidence": 0.0, "detections": []}
+            engine = _get_ocr_engine()
+            if engine is not None:
+                # 1. Full-image OCR
+                full_result = _run_engine(engine, img_work, min_chars=2, with_boxes=True)
 
-            # 1. Full-image EasyOCR at high resolution
-            full_result = _run_easyocr(reader, img_work, min_chars=2, with_boxes=True)
+                # 2. Candidate plate ROIs (bounded to keep runtime + RAM low)
+                crop_results: List[Dict[str, Any]] = []
+                plate_rois = _locate_plate_rois(img_work, top_n=_MAX_CROP_OCR_CALLS)
 
-            # 2. Extract candidate plate ROIs (color-agnostic: white, yellow, green, silver)
-            crop_results: List[Dict[str, Any]] = []
-            plate_rois = _locate_plate_rois(img_work, top_n=6)
+                for roi in plate_rois:
+                    patch = _crop_and_enhance_patch(img_work, roi)
+                    if patch is not None:
+                        c_res = _run_engine(engine, patch, min_chars=2, with_boxes=False)
+                        if c_res:
+                            crop_results.append(c_res)
 
-            for roi in plate_rois:
-                patch = _crop_and_enhance_patch(img_work, roi)
-                if patch is not None:
-                    c_res = _run_easyocr(reader, patch, min_chars=2, with_boxes=False)
-                    if c_res:
-                        crop_results.append(c_res)
+                combined = _merge_ocr_results(full_result, *crop_results)
+                if combined.get("text"):
+                    gc.collect()
+                    return combined
 
-            combined = _merge_ocr_results(full_result, *crop_results)
+            # 3. Lightweight fallback when no heavy model can be loaded
+            tess_result = _tesseract_extract(img_work)
             gc.collect()
-            return combined
+            if tess_result:
+                return tess_result
+            return {"text": "", "confidence": 0.0, "detections": []}
 
         except Exception as e:
             gc.collect()

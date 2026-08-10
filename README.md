@@ -55,7 +55,7 @@ Backend API & interactive Web Application for vehicle image quality analysis, un
        │ 1. Clarity / Blur Detection (Laplacian Variance)       │
        │ 2. Brightness & Exposure Analysis                      │
        │ 3. Exact (SHA-256) & Perceptual (pHash) Duplicates     │
-       │ 4. OCR Scene Text Extraction (EasyOCR)                 │
+        │ 4. OCR Scene Text Extraction (RapidOCR)                    │
        │ 5. Universal License Plate Recognition (Cars/Bikes/EU)│
        │ 6. Metadata EXIF & Screenshot Detection                │
        │ 7. Automated Software Tampering Analysis               │
@@ -79,7 +79,7 @@ Backend API & interactive Web Application for vehicle image quality analysis, un
 * **Frontend Web Dashboard:** HTML5, Vanilla CSS3 (Glassmorphism), JavaScript (Fetch API)
 * **Database:** SQLAlchemy 2.0 (Generic Uuid & Portable Enums), PostgreSQL / SQLite, Alembic
 * **Task Queue & Broker:** Celery 5.3+, Redis 7 (with FastAPI `BackgroundTasks` fallback)
-* **Computer Vision & ML:** OpenCV (`opencv-python-headless`), EasyOCR, ImageHash, Pillow, NumPy
+* **Computer Vision & ML:** OpenCV, RapidOCR (ONNX PP-OCRv4), Tesseract, ImageHash, Pillow, NumPy
 * **Logging & Validation:** Structlog, Pydantic V2, Pydantic Settings
 * **Testing:** Pytest, HTTPX, Starlette TestClient
 
@@ -150,7 +150,7 @@ media-processing-pipeline/
 1. **Clarity / Blur Detection**: Laplacian variance metric (`score < 100` flagged as blurry).
 2. **Brightness & Lighting**: Mean intensity categorization (`very_dark`, `low_light`, `acceptable`, `bright`, `overexposed`).
 3. **Duplicate Detection**: SHA-256 exact hash matching + Perceptual hashing (`pHash` hamming distance threshold `≤ 6`).
-4. **OCR Text Extraction**: EasyOCR text detection & bounding box confidence scoring.
+4. **OCR Text Extraction**: RapidOCR (PP-OCRv4 ONNX) text detection & bounding box confidence scoring, with Tesseract fallback.
 5. **Universal License Plate Recognition**: Multi-regex format matching + 2-line motorcycle plate token joining + vehicle brand noise exclusion.
 6. **Metadata & Screenshot Detection**: EXIF camera attribute extraction + screenshot probability calculation.
 7. **Tampering Detection**: EXIF software signature inspection for photo manipulation tools (Photoshop, Canva, GIMP, etc.).
@@ -340,7 +340,7 @@ python -m pytest
 - **DMV / Vahan API Verification**: Add external API integrations (e.g. Parivahan / DMV APIs) to cross-reference extracted plate text against registered vehicle databases.
 
 ### 3. Scalability Concerns
-- **Worker Concurrency & GPU Acceleration**: CPU-bound EasyOCR and OpenCV processing can become a bottleneck at high throughput. Production deployments should utilize GPU-accelerated Celery workers (`torch.cuda`) with auto-scaling worker pools.
+- **Worker Concurrency & GPU Acceleration**: CPU-bound OCR and OpenCV processing can become a bottleneck at high throughput. Production deployments should utilize GPU-accelerated Celery workers with auto-scaling worker pools.
 - **Distributed Shared Storage**: Local file storage does not scale horizontally across multiple web nodes. A production setup requires AWS S3 or Google Cloud Storage with CDN caching.
 
 ### 4. Failure Handling Concerns

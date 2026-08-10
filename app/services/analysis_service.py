@@ -1,4 +1,5 @@
 import gc
+import threading
 from typing import Any, Dict, List
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -15,6 +16,11 @@ from app.services.image_service import ImageService
 from app.utils.file_utils import load_image_auto_orient
 from app.core.logging import logger
 
+# Serializes in-process pipeline runs (FastAPI BackgroundTasks fallback) so that
+# multiple concurrent uploads never load OCR engines / decode images at once,
+# keeping 512 MB instances well under the memory limit.
+_ANALYSIS_LOCK = threading.Lock()
+
 
 class AnalysisService:
     def __init__(self):
@@ -28,6 +34,12 @@ class AnalysisService:
         self.photo_of_photo_analyzer = PhotoOfPhotoAnalyzer()
 
     def run_pipeline(
+        self, db: Session, image_id: UUID, file_path: str, sha256_hash: str
+    ) -> Dict[str, Any]:
+        with _ANALYSIS_LOCK:
+            return self._execute_pipeline(db, image_id, file_path, sha256_hash)
+
+    def _execute_pipeline(
         self, db: Session, image_id: UUID, file_path: str, sha256_hash: str
     ) -> Dict[str, Any]:
         with open(file_path, "rb") as f:

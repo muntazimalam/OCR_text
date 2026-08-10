@@ -7,8 +7,9 @@ services:
     name: media-processing-pipeline
     runtime: python
     buildCommand: |
-      apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*
+      apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng libgl1 libglib2.0-0 libgomp1 libsm6 libxext6 libxrender1 && rm -rf /var/lib/apt/lists/*
       pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+      python -c "from rapidocr_onnxruntime import RapidOCR; RapidOCR(intra_op_num_threads=2)" || true
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
@@ -16,4 +17,4 @@ services:
       - key: PORT
         value: "8000"
       - key: OCR_ENGINE
-        value: "tesseract"
+        value: "auto"

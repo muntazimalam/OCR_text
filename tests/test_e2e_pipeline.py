@@ -19,8 +19,8 @@ def create_vehicle_image_with_plate():
 
 def test_e2e_image_processing_pipeline():
     mock_reader = MagicMock()
-    mock_reader.readtext.return_value = [([], "KA01AB1234", 0.95)]
-    ocr_module._easyocr_reader = mock_reader
+    mock_reader.return_value = ([[[], "KA01AB1234", 0.95]], 0.5)
+    ocr_module._OCR_ENGINE = mock_reader
     img_bytes = create_vehicle_image_with_plate()
 
     with TestClient(fastapi_app) as client:

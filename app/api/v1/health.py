@@ -49,7 +49,7 @@ def check_health():
             "blur (Laplacian + Tenengrad)",
             "brightness + contrast",
             "duplicate (SHA-256)",
-            "ocr (EasyOCR)",
+            "ocr (RapidOCR PP-OCRv4 + Tesseract fallback)",
             "number_plate (regex + heuristic)",
             "metadata (EXIF)",
             "tampering",

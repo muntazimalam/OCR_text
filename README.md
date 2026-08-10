@@ -366,3 +366,7 @@ python -m pytest
 
 ### 4. Failure Handling Concerns
 - **Poison Pill Tasks & Dead-Letter Queues**: Unhandled image corruptions could crash workers. Added try-catch blocks per analyzer, but a production pipeline should introduce a Celery Dead-Letter Queue (DLQ) to isolate failing tasks after 3 retries.
+
+---
+
+> 📄 For a full account of every assumption, limitation, and design decision, see **[trade-off.md](trade-off.md)**.

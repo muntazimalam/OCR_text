@@ -23,9 +23,6 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download RapidOCR ONNX models (~15MB) so workers never download at runtime
-RUN python -c "from rapidocr_onnxruntime import RapidOCR; RapidOCR(intra_op_num_threads=2)" || true
-
 COPY . .
 
 EXPOSE 8000

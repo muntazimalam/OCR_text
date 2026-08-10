@@ -13,7 +13,7 @@ from app.analyzers.metadata import MetadataAnalyzer
 from app.analyzers.tampering import TamperingAnalyzer
 from app.analyzers.photo_of_photo import PhotoOfPhotoAnalyzer
 from app.services.image_service import ImageService
-from app.utils.file_utils import load_image_auto_orient
+from app.utils.file_utils import load_image_auto_orient, downscale_image_bytes
 from app.core.logging import logger
 
 # Serializes in-process pipeline runs (FastAPI BackgroundTasks fallback) so that
@@ -49,6 +49,12 @@ class AnalysisService:
         file_bytes, _, _, _ = load_image_auto_orient(raw_bytes)
         # Free raw_bytes immediately
         del raw_bytes
+        gc.collect()
+
+        # Downscale ONCE so every analyzer decodes a bounded-size image instead
+        # of re-decoding the full original (12MP photo = ~36MB per decode) at
+        # each of the 8 pipeline stages. Keeps 512MB instances safe.
+        file_bytes = downscale_image_bytes(file_bytes, max_dim=1600)
         gc.collect()
 
         issues: List[Dict[str, Any]] = []

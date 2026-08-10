@@ -18,8 +18,8 @@ def _get_ocr_engine():
     OCR_ENGINE env: 'tesseract' (forced lightweight fallback), 'rapidocr' (forced),
     or 'auto' (default) — auto prefers RapidOCR when importable.
 
-    RapidOCR uses ~15 MB of ONNX models and no PyTorch, so it loads a small
-    fraction of EasyOCR's RAM/disk footprint and keeps 512 MB instances safe
+    RapidOCR uses ~13 MB of bundled ONNX models and no PyTorch, so it loads a
+    small fraction of EasyOCR's RAM/disk footprint and keeps 512 MB instances safe
     while staying significantly more accurate than Tesseract.
     """
     global _OCR_ENGINE
@@ -41,10 +41,9 @@ def _get_ocr_engine():
 
     try:
         from rapidocr_onnxruntime import RapidOCR
-        try:
-            _OCR_ENGINE = RapidOCR(intra_op_num_threads=2)
-        except TypeError:
-            _OCR_ENGINE = RapidOCR()
+        # Models are bundled inside the pip package (~13MB), no download needed.
+        # Session options already disable the memory arena for low-RAM hosts.
+        _OCR_ENGINE = RapidOCR()
         logger.info("rapidocr_loaded")
     except Exception as e:
         logger.warning("rapidocr_init_failed", error=str(e))

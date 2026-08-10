@@ -19,6 +19,3 @@ rm -rf /var/lib/apt/lists/*
 # Install Python dependencies
 pip install --upgrade pip
 pip install --no-cache-dir -r requirements.txt
-
-# Pre-download RapidOCR ONNX models (~15MB) so workers never download at runtime
-python -c "from rapidocr_onnxruntime import RapidOCR; RapidOCR(intra_op_num_threads=2)" || true

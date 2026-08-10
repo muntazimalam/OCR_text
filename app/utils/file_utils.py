@@ -13,26 +13,47 @@ def calculate_sha256(file_bytes: bytes) -> str:
 
 def validate_image_bytes(file_bytes: bytes) -> tuple[bool, str, tuple[int, int]]:
     """
-    Decodes image using PIL & OpenCV to verify it's a valid image.
+    Validates image header/size using PIL (lazy, no full pixel decode).
     Returns (is_valid, content_type, (width, height)).
+    Memory-optimized: avoids a full-res cv2 decode in the request thread.
     """
     try:
         pil_img = PILImage.open(io.BytesIO(file_bytes))
         width, height = pil_img.size
         format_name = pil_img.format.lower() if pil_img.format else ""
-        
+
+        pil_img.verify()
+
         mime_type = f"image/{format_name}" if format_name in {"jpeg", "png", "webp"} else "image/jpeg"
         if format_name == "jpg":
             mime_type = "image/jpeg"
-            
-        nparr = np.frombuffer(file_bytes, np.uint8)
-        cv_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if cv_img is None:
-            return False, "", (0, 0)
 
         return True, mime_type, (width, height)
     except Exception:
         return False, "", (0, 0)
+
+
+def downscale_image_bytes(file_bytes: bytes, max_dim: int = 1600, quality: int = 90) -> bytes:
+    """
+    Downscales (only when larger than max_dim) and re-encodes image bytes so
+    every analyzer works on a bounded-size image instead of decoding the full
+    original (e.g. a 12MP photo = ~36MB per decode) on each pipeline stage.
+    Returns the original bytes untouched when already small enough.
+    """
+    try:
+        nparr = np.frombuffer(file_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            return file_bytes
+        h, w = img.shape[:2]
+        if max(h, w) <= max_dim:
+            return file_bytes
+        scale = max_dim / float(max(h, w))
+        small = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        return buf.tobytes() if ok else file_bytes
+    except Exception:
+        return file_bytes
 
 
 from PIL import ImageOps

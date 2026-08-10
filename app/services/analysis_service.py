@@ -63,13 +63,6 @@ class AnalysisService:
         # 1. Blur
         try:
             blur_res = self.blur_analyzer.analyze(file_path, file_bytes)
-            if blur_res.get("is_blurry"):
-                issues.append({
-                    "type": "blurry_image",
-                    "severity": "medium",
-                    "confidence": 0.85,
-                    "description": f"Image is blurry with variance score {blur_res.get('score')}"
-                })
         except Exception as e:
             logger.error("blur_analyzer_error", error=str(e))
             blur_res = {"score": 0.0, "is_blurry": None, "error": str(e)}
@@ -90,6 +83,19 @@ class AnalysisService:
             logger.error("brightness_analyzer_error", error=str(e))
             brightness_res = {"score": 0.0, "status": "error", "error": str(e)}
         gc.collect()
+
+        # Blur issue — skipped when low contrast from lighting explains the
+        # low sharpness score (dark/overexposed images look 'blurry' to a
+        # variance metric even when perfectly in focus).
+        if blur_res.get("is_blurry"):
+            lighting_explains = brightness_res.get("status") in {"very_dark", "overexposed"}
+            if not lighting_explains:
+                issues.append({
+                    "type": "blurry_image",
+                    "severity": "medium",
+                    "confidence": 0.85,
+                    "description": f"Image is blurry with variance score {blur_res.get('score')}"
+                })
 
         # 3. Duplicate
         try:
@@ -184,7 +190,7 @@ class AnalysisService:
         # Failure Condition Checks
         if not plate_res.get("valid"):
             failure_reasons.append("No valid license plate detected")
-        if blur_res.get("is_blurry"):
+        if blur_res.get("is_blurry") and brightness_res.get("status") not in {"very_dark", "overexposed"}:
             failure_reasons.append("Image is blurry")
         if brightness_res.get("status") in {"very_dark", "overexposed"}:
             failure_reasons.append("Suboptimal lighting")

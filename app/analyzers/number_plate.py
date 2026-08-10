@@ -192,8 +192,9 @@ class NumberPlateAnalyzer(BaseAnalyzer):
                         best_format = fmt_name
                         is_valid = True
 
-        # Enforce strict 10-character length requirement for valid license plates
-        if best_plate and len(best_plate) != 10:
+        # Enforce minimum length to reject OCR noise, while allowing valid
+        # 9-character Indian plates (e.g. KA53EK529) alongside 10-character ones.
+        if best_plate and len(best_plate) < 9:
             best_plate = None
             is_valid = False
             best_conf = 0.0

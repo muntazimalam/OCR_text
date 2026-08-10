@@ -53,6 +53,6 @@ def check_health():
             "number_plate (regex + heuristic)",
             "metadata (EXIF)",
             "tampering",
-            "photo_of_photo (Moiré)"
+            "photo_of_photo (Moire)"
         ]
     }

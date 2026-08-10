@@ -6,7 +6,10 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/media_pipeline"
+    # Defaults to SQLite so deployments without PostgreSQL (e.g. Render free
+    # tier, Docker without the postgres service) start cleanly with no error.
+    # Set DATABASE_URL to a PostgreSQL URL to opt into PostgreSQL.
+    DATABASE_URL: str = "sqlite:///./media_pipeline.db"
     REDIS_URL: str = "redis://localhost:6379/0"
 
     UPLOAD_DIR: str = "uploads"

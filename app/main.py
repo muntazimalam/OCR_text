@@ -1,6 +1,7 @@
+import asyncio
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -9,6 +10,7 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.core.logging import setup_logging, logger
+from app.services.visit_service import VisitService, TRACKED_PATHS
 import app.models  # Ensure models are imported for create_all
 
 
@@ -43,6 +45,13 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         _sync_schema()
         logger.info("database_tables_initialized")
+        if engine.dialect.name != "postgresql":
+            logger.warning(
+                "database_is_sqlite",
+                hint="SQLite files live on local disk and are erased on instance "
+                "restarts (e.g. Render free tier). Set DATABASE_URL to a managed "
+                "PostgreSQL database to persist data across restarts.",
+            )
     except Exception as e:
         logger.error("database_init_error", error=str(e))
         
@@ -68,6 +77,24 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.middleware("http")
+async def track_page_visits(request: Request, call_next):
+    """
+    Records visitor page hits (IP, user agent, path, access time) into the
+    database. The insert is synchronous so the visit is never missed; the
+    optional geo lookup runs in the background and never blocks the page.
+    """
+    response = await call_next(request)
+    try:
+        if settings.TRACK_VISITS and request.method == "GET" and request.url.path in TRACKED_PATHS:
+            visit_id = VisitService.record_page_visit(request)
+            if visit_id:
+                asyncio.create_task(VisitService.enrich_with_location(visit_id))
+    except Exception as exc:
+        logger.error("visit_tracking_error", error=str(exc))
+    return response
 
 # Mount uploads directory for viewing processed images
 if os.path.exists(settings.UPLOAD_DIR):

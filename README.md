@@ -144,6 +144,7 @@ media-processing-pipeline/
 | `GET` | `/api/v1/images/{id}/results` | Detailed quality score, heuristics & detected issues |
 | `GET` | `/api/v1/images/{id}/file` | Serve raw uploaded image file |
 | `DELETE` | `/api/v1/images/{id}` | Delete image database record and stored file |
+| `GET` | `/api/v1/visits` | List recorded page visits (IP, approximate location, access time) |
 
 ---
 
@@ -296,12 +297,15 @@ docker compose up --build
 The app is tuned to run on Render's free 512 MB instances without OOM crashes:
 
 1. **Create a Web Service** pointing at the repository (Python 3.11, build/start commands are auto-detected from `render.yaml`).
-2. **Optional environment variables** (`render.yaml` already defines the safe defaults):
+2. **Database persistence (important)**: Render free instances use an *ephemeral disk* — an SQLite database (`media_pipeline.db`) is erased every time the instance restarts or redeploys, which is why saved data disappears when the service goes offline and returns.
+   - `render.yaml` now declares a **free managed PostgreSQL database** (`media-pipeline-db`) and injects its `DATABASE_URL` into the web service automatically, so all images, analyses, and visitor records persist in durable storage across restarts.
+   - If you deploy manually (not via `render.yaml`): create a PostgreSQL database on Render, copy its *Internal Database URL*, and set it as the `DATABASE_URL` environment variable on the web service. The API auto-creates the schema on first boot.
+   - Verify at `/api/v1/health` → `database.persistence` reports `durable (managed PostgreSQL ...)`. If it reports the ephemeral SQLite warning, `DATABASE_URL` is not configured.
+3. **Optional environment variables** (`render.yaml` already defines the safe defaults):
    - `OCR_ENGINE=auto` — `auto` (RapidOCR + Tesseract fallback), `rapidocr`, or `tesseract` (lowest memory).
    - `OMP_NUM_THREADS=1`, `OMP_WAIT_POLICY=PASSIVE`, `MALLOC_ARENA_MAX=2` — bound ONNX/OpenCV thread workspaces.
-   - `DATABASE_URL` — leave unset to use the SQLite fallback, or point to a managed PostgreSQL service.
-3. **No Redis required**: with no Celery/Redis configured, processing runs via FastAPI `BackgroundTasks` (`fallback_sync_mode`), which the `/api/v1/health` endpoint reports.
-4. **Deploy** — measured memory peaks: ~280 MB during analysis of typical vehicle photos, ~400 MB worst case (text-dense images), well under the 512 MB cap.
+4. **No Redis required**: with no Celery/Redis configured, processing runs via FastAPI `BackgroundTasks` (`fallback_sync_mode`), which the `/api/v1/health` endpoint reports.
+5. **Deploy** — measured memory peaks: ~280 MB during analysis of typical vehicle photos, ~400 MB worst case (text-dense images), well under the 512 MB cap.
 
 > If PostgreSQL is configured but unreachable (e.g. connection refused), the app logs the error and continues on SQLite so the API never goes down.
 

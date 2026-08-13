@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE_MB: int = 10
     API_V1_STR: str = "/api/v1"
 
+    # Visitor tracking — page visits are persisted with IP, approximate
+    # location (best-effort lookup) and access time. Set TRACK_VISITS=False
+    # to disable storage entirely, GEO_LOOKUP_ENABLED=False to skip the
+    # external ip-api.com lookup (location fields stay null).
+    TRACK_VISITS: bool = True
+    GEO_LOOKUP_ENABLED: bool = True
+    GEO_LOOKUP_URL: str = "http://ip-api.com/json/{ip}"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

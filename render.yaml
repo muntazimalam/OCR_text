@@ -2,6 +2,16 @@
 # Render auto-detects this file and applies settings on next deploy
 # Docs: https://docs.render.com/infrastructure-as-code
 
+# Managed PostgreSQL — data lives on Render's durable storage, NOT the
+# ephemeral instance disk. SQLite (the default when DATABASE_URL is unset)
+# lives on the instance disk and is erased on every restart, which is why
+# records disappear when the free instance goes offline and comes back.
+databases:
+  - name: media-pipeline-db
+    databaseName: media_pipeline
+    user: media_pipeline
+    plan: free
+
 services:
   - type: web
     name: media-processing-pipeline
@@ -15,6 +25,10 @@ services:
         value: "3.11.9"
       - key: PORT
         value: "8000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: media-pipeline-db
+          property: connectionString
       - key: OCR_ENGINE
         value: "auto"
       - key: OMP_NUM_THREADS

@@ -151,7 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
     filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === name));
   }
   filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => setFilter(btn.dataset.filter));
+    btn.addEventListener('click', () => {
+      setFilter(btn.dataset.filter);
+      loadGallery();
+    });
   });
 
   // ─── Drop Zone Reset ───────────────────────────────────────────────────────

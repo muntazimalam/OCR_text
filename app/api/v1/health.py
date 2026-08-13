@@ -39,7 +39,12 @@ def check_health():
         "uptime_seconds": uptime_seconds,
         "database": {
             "status": db_status,
-            "dialect": db_dialect
+            "dialect": db_dialect,
+            "persistence": (
+                "durable (managed PostgreSQL — data survives restarts)"
+                if engine.dialect.name == "postgresql"
+                else "ephemeral local file (erased on instance restart — configure DATABASE_URL to PostgreSQL to persist data)"
+            )
         },
         "task_queue": {
             "redis_status": redis_status,

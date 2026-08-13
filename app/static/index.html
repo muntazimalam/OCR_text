@@ -3,129 +3,99 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Vehicle forensics pipeline — image quality analysis, universal license plate recognition, tampering detection.">
-  <meta name="theme-color" content="#030509">
-  <title>Vehicle Forensics Lab — Media Processing Pipeline</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <meta name="description" content="Media processing dashboard — image quality analysis, license plate recognition, tampering detection.">
+  <meta name="theme-color" content="#f6f8fa">
+  <title>Media Processing Pipeline — Vehicle Image Analysis</title>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <!-- ═══ VFX LAYERS ═══ -->
-  <canvas id="fxCanvas" aria-hidden="true"></canvas>
-  <div class="noise" aria-hidden="true"></div>
-  <div id="cursorGlow" aria-hidden="true"></div>
-
-  <!-- ═══ TOAST ═══ -->
   <div id="toast-container" aria-live="polite"></div>
 
   <div class="container">
-    <!-- ═══ HUD HEADER ═══ -->
-    <header class="hud-header">
-      <div class="logo-section">
-        <div class="radar-logo" aria-hidden="true">
-          <span class="rings r1"></span>
-          <span class="rings r2"></span>
-          <span class="rings r3"></span>
-          <span class="sweep"></span>
-          <span class="core">🚙</span>
-        </div>
-        <div class="brand-titles">
-          <h1>VEHICLE FORENSICS LAB</h1>
-          <p class="subtitle">Media Processing Pipeline</p>
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon" aria-hidden="true">🚗</span>
+        <div class="logo-text">
+          <h1>Media Processing Pipeline</h1>
+          <p>Vehicle image quality · license plate · authenticity analysis</p>
         </div>
       </div>
-
-      <div class="header-right">
-        <span class="hud-badge">
-          <span class="indicator-dot" aria-label="API online"></span> API&nbsp;v1.0.0
-        </span>
-        <a href="/docs" target="_blank" rel="noopener" class="hud-badge">⌘ SWAGGER</a>
-        <a href="/api/v1/health" target="_blank" rel="noopener" class="hud-badge">♥ HEALTH</a>
-        <div id="sysClock" aria-hidden="true">
-          <div class="t">--:--:--</div>
-          <div class="d">----/--/--</div>
-        </div>
-        <span class="hud-badge"><span class="rec-dot"></span> LIVE</span>
-      </div>
+      <nav class="header-links" aria-label="Header links">
+        <span class="api-badge">API v1.0.0</span>
+        <a href="/docs" target="_blank" rel="noopener">API Docs</a>
+        <a href="/api/v1/health" target="_blank" rel="noopener">Health</a>
+      </nav>
     </header>
 
-    <!-- ═══ PIPELINE STATISTICS ═══ -->
-    <div class="stats-banner" id="statsBanner" aria-label="Pipeline statistics">
-      <div class="stat-card" style="--stat-color: #8fb3c7;">
-        <div class="stat-value skeleton" id="statTotal" style="height:2.1rem; width:55%; border-radius:4px;">&nbsp;</div>
-        <div class="stat-label">Total Processed</div>
+    <section class="stats" id="statsBanner" aria-label="Pipeline statistics">
+      <div class="stat-card" style="--stat-color: #64748b;">
+        <div class="stat-value skeleton" id="statTotal">&nbsp;</div>
+        <div class="stat-label">Total processed</div>
       </div>
-      <div class="stat-card" style="--stat-color: #00ff9d;">
-        <div class="stat-value skeleton" id="statCompleted" style="height:2.1rem; width:55%; border-radius:4px;">&nbsp;</div>
+      <div class="stat-card" style="--stat-color: #059669;">
+        <div class="stat-value skeleton" id="statCompleted">&nbsp;</div>
         <div class="stat-label">Completed</div>
       </div>
-      <div class="stat-card" style="--stat-color: #ff4d5e;">
-        <div class="stat-value skeleton" id="statFailed" style="height:2.1rem; width:55%; border-radius:4px;">&nbsp;</div>
+      <div class="stat-card" style="--stat-color: #dc2626;">
+        <div class="stat-value skeleton" id="statFailed">&nbsp;</div>
         <div class="stat-label">Failed</div>
       </div>
-      <div class="stat-card" style="--stat-color: #ffb42b;">
-        <div class="stat-value skeleton" id="statPending" style="height:2.1rem; width:55%; border-radius:4px;">&nbsp;</div>
-        <div class="stat-label">In Queue</div>
+      <div class="stat-card" style="--stat-color: #d97706;">
+        <div class="stat-value skeleton" id="statPending">&nbsp;</div>
+        <div class="stat-label">In queue</div>
       </div>
-      <div class="stat-card" style="--stat-color: #00e5ff;">
-        <div class="stat-value skeleton" id="statPassRate" style="height:2.1rem; width:65%; border-radius:4px;">&nbsp;</div>
-        <div class="stat-label">Pass Rate</div>
+      <div class="stat-card" style="--stat-color: #2563eb;">
+        <div class="stat-value skeleton" id="statPassRate">&nbsp;</div>
+        <div class="stat-label">Pass rate</div>
       </div>
-    </div>
+    </section>
 
-    <main class="dashboard-grid">
-      <!-- ═══ UPLOAD PANEL ═══ -->
-      <section class="hud-card" aria-label="Upload vehicle image">
-        <div class="card-title">
-          <span class="tag">UPLOAD &amp; ANALYZE</span>
-          <span class="hud-status">ASYNC PIPELINE</span>
+    <main class="layout">
+      <section class="panel" aria-label="Upload vehicle image">
+        <div class="panel-head">
+          <h2>Upload image</h2>
+          <span class="muted">Analysis runs in the background</span>
         </div>
 
         <form id="uploadForm" aria-label="Image upload form">
           <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" multiple style="display: none;" aria-label="Select image files">
           <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Drag and drop zone">
-            <div class="grid-help" aria-hidden="true">
-              <span class="a"></span><span class="b"></span><span class="c"></span><span class="d"></span>
-            </div>
             <div id="dropZoneContent">
-              <span class="upload-icon" aria-hidden="true">📡</span>
-              <p><strong>Drag vehicle image into scan zone</strong></p>
-              <p class="subtitle">JPG · PNG · WEBP — 10MB</p>
-              <button class="btn-upload" type="button" id="browseBtn">Browse Files</button>
+              <span class="upload-icon" aria-hidden="true">📁</span>
+              <p><strong>Drag &amp; drop vehicle images here</strong></p>
+              <p class="drop-or">or</p>
+              <button class="btn-upload" type="button" id="browseBtn">Browse files</button>
+              <p class="subtitle">JPG · PNG · WEBP — up to 10 MB each</p>
             </div>
           </div>
         </form>
 
-        <div class="quick-samples">
-          <div class="samples-label">One-Click Test Samples</div>
+        <div class="samples">
+          <p class="samples-label">Or try one of these:</p>
           <div class="samples-btns">
-            <button class="btn-sample" id="sampleClean"      style="--samp-color:#00ff9d;" onclick="testSample('clean')">▸ Clean Plate</button>
-            <button class="btn-sample" id="sampleBlurry"     style="--samp-color:#ff4d5e;" onclick="testSample('blurry')">▸ Blurry Image</button>
-            <button class="btn-sample" id="sampleDark"       style="--samp-color:#8fb3c7;" onclick="testSample('dark')">▸ Low Light</button>
-            <button class="btn-sample" id="sampleScreenshot" style="--samp-color:#ffb42b;" onclick="testSample('screenshot')">▸ Screenshot</button>
+            <button class="btn-sample" id="sampleClean" onclick="testSample('clean')">Clean plate</button>
+            <button class="btn-sample" id="sampleBlurry" onclick="testSample('blurry')">Blurry image</button>
+            <button class="btn-sample" id="sampleDark" onclick="testSample('dark')">Low light</button>
+            <button class="btn-sample" id="sampleScreenshot" onclick="testSample('screenshot')">Screenshot</button>
           </div>
         </div>
       </section>
 
-      <!-- ═══ GALLERY PANEL ═══ -->
-      <section class="hud-card" aria-label="Processed media gallery">
-        <div class="gallery-controls">
-          <div class="card-title" style="margin:0;">
-            <span class="tag" style="--c:#ffb42b;">PROCESSED GALLERY</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
-            <button class="btn-icon" id="refreshBtn" title="Refresh gallery & stats" aria-label="Refresh gallery and statistics">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+      <section class="panel" aria-label="Processed media gallery">
+        <div class="panel-head gallery-head">
+          <h2>Processed images</h2>
+          <div class="gallery-tools">
+            <button class="btn-icon" id="refreshBtn" title="Refresh gallery and stats">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
                 <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
               </svg>
               Refresh
             </button>
             <div class="filter-group" role="group" aria-label="Filter images by status">
-              <button class="filter-btn active" data-filter="all"        id="filterAll">All</button>
-              <button class="filter-btn"        data-filter="completed"  id="filterCompleted">Completed</button>
-              <button class="filter-btn"        data-filter="pending"    id="filterPending">Pending</button>
-              <button class="filter-btn"        data-filter="failed"     id="filterFailed">Failed</button>
+              <button class="filter-btn active" data-filter="all" id="filterAll">All</button>
+              <button class="filter-btn" data-filter="completed" id="filterCompleted">Completed</button>
+              <button class="filter-btn" data-filter="pending" id="filterPending">Queued</button>
+              <button class="filter-btn" data-filter="failed" id="filterFailed">Failed</button>
             </div>
           </div>
         </div>
@@ -141,15 +111,13 @@
       </section>
     </main>
 
-    <!-- ═══ HUD FOOTER ═══ -->
-    <footer class="hud-footer">
-      <span>PIPELINE&nbsp;v4.2<span class="pipe"></span>CV-HEURISTICS&nbsp;ONLINE<span class="pipe"></span>8-STAGE&nbsp;ANALYSIS</span>
-      <span class="scan-line" aria-hidden="true"></span>
-      <span>AUTO-CALIBRATED · <span id="footerClock">--:--:--</span> UTC</span>
+    <footer class="footer">
+      <span>8-stage analysis pipeline</span>
+      <span class="footer-divider" aria-hidden="true"></span>
+      <span>Stored images are served locally</span>
     </footer>
   </div>
 
-  <!-- ═══ INSPECTION MODAL ═══ -->
   <div class="modal-overlay" id="inspectModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-container">
       <div class="modal-header">
@@ -165,26 +133,22 @@
           <div class="score-ring-container">
             <div class="score-ring-wrapper">
               <svg class="score-ring-svg" width="118" height="118" viewBox="0 0 118 118" aria-hidden="true">
-                <g class="score-ring-ticks">
-                  <circle cx="59" cy="59" r="52" stroke-dasharray="2.5 11.64"/>
-                  <circle cx="59" cy="59" r="42" stroke-dasharray="0.8 8.1"/>
-                </g>
-                <circle class="score-ring-bg"   cx="59" cy="59" r="44"/>
+                <circle class="score-ring-bg" cx="59" cy="59" r="44"/>
                 <circle class="score-ring-fill" cx="59" cy="59" r="44" id="scoreRingFill"/>
               </svg>
               <div id="scoreDisplay">—</div>
             </div>
-            <div class="score-ring-text">Overall Quality Score</div>
+            <div class="score-ring-text">Overall quality score</div>
           </div>
         </div>
 
         <div>
-          <div class="metrics-heading">Analysis Heuristics</div>
+          <div class="metrics-heading">Analysis heuristics</div>
           <div class="metrics-list" id="metricsContainer">
             <!-- Dynamic metrics injected by app.js -->
           </div>
 
-          <div class="issues-heading">System Flags</div>
+          <div class="issues-heading">Flags &amp; issues</div>
           <div class="issues-list" id="issuesContainer">
             <!-- Dynamic issues injected by app.js -->
           </div>

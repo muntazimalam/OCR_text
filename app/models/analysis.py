@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Float, Boolean, DateTime, ForeignKey, JSON, Uuid
+from sqlalchemy import Column, String, Float, Boolean, DateTime, ForeignKey, JSON, Uuid, Integer
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -20,6 +20,8 @@ class AnalysisResult(Base):
     
     is_duplicate = Column(Boolean, default=False)
     duplicate_of = Column(Uuid(as_uuid=True), nullable=True)
+    phash = Column(String(64), nullable=True, index=True)
+    similarity = Column(Integer, nullable=True)
     
     ocr_text = Column(String, nullable=True)
     ocr_confidence = Column(Float, nullable=True)

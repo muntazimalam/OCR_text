@@ -110,6 +110,20 @@ class AnalysisService:
                     "confidence": 1.0,
                     "description": f"Exact SHA-256 duplicate of image {existing_dup.id}"
                 })
+            else:
+                near_dup, hamming_dist = ImageService.find_near_duplicate(
+                    db, duplicate_res.get("phash"), image_id
+                )
+                if near_dup is not None:
+                    duplicate_res["is_duplicate"] = True
+                    duplicate_res["duplicate_of"] = near_dup.id
+                    duplicate_res["similarity"] = hamming_dist
+                    issues.append({
+                        "type": "near_duplicate",
+                        "severity": "high",
+                        "confidence": 0.90,
+                        "description": f"Perceptual pHash duplicate (hamming distance {hamming_dist}) of image {near_dup.id}"
+                    })
         except Exception as e:
             logger.error("duplicate_analyzer_error", error=str(e))
             duplicate_res = {"is_duplicate": False, "error": str(e)}
@@ -207,6 +221,8 @@ class AnalysisService:
             "contrast_score": brightness_res.get("contrast_score"),
             "is_duplicate": duplicate_res.get("is_duplicate", False),
             "duplicate_of": duplicate_res.get("duplicate_of"),
+            "phash": duplicate_res.get("phash"),
+            "similarity": duplicate_res.get("similarity"),
             "ocr_text": ocr_res.get("text"),
             "ocr_confidence": ocr_res.get("confidence"),
             "plate_detected": plate_res.get("detected", False),

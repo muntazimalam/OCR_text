@@ -319,7 +319,7 @@ python -m pytest
 
 ## 📌 Assumptions Made
 
-1. **Upload Constraints**: Max file size is set to 15 MB. Supported image MIME types are `image/jpeg`, `image/png`, `image/webp`.
+1. **Upload Constraints**: Max file size is set to 10 MB. Supported image MIME types are `image/jpeg`, `image/png`, `image/webp`.
 2. **License Plate Verification**: Format validation uses structural pattern matching (regex + token joining) rather than querying live government DMV databases.
 3. **Queue Fallback**: In environments without active Redis/Celery infrastructure, the API automatically falls back to FastAPI `BackgroundTasks` to guarantee non-blocking asynchronous execution.
 

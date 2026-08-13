@@ -84,6 +84,47 @@ class ImageService:
         ).first()
 
     @staticmethod
+    def find_near_duplicate(
+        db: Session, phash_str: str, current_image_id: UUID, threshold: int = 6
+    ) -> tuple[Optional[Image], Optional[int]]:
+        """
+        Finds a completed image whose perceptual hash (pHash) is within the
+        given hamming distance threshold of the current image. Returns
+        (closest_image, hamming_distance).
+        """
+        if not phash_str:
+            return None, None
+        try:
+            from imagehash import hex_to_hash
+            target = hex_to_hash(phash_str)
+        except Exception:
+            return None, None
+
+        from app.models.analysis import AnalysisResult
+        rows = (
+            db.query(AnalysisResult, Image)
+            .join(Image, AnalysisResult.image_id == Image.id)
+            .filter(
+                AnalysisResult.phash.isnot(None),
+                AnalysisResult.image_id != current_image_id,
+                Image.status == ImageStatus.COMPLETED,
+            )
+            .all()
+        )
+
+        closest = None
+        closest_dist = threshold + 1
+        for analysis, img in rows:
+            try:
+                dist = target - hex_to_hash(analysis.phash)
+            except Exception:
+                continue
+            if dist < closest_dist:
+                closest_dist = dist
+                closest = img
+        return (closest, closest_dist) if closest is not None else (None, None)
+
+    @staticmethod
     def get_all_images(db: Session, skip: int = 0, limit: int = 20, status_filter: Optional[ImageStatus] = None):
         from sqlalchemy.orm import joinedload
         query = db.query(Image).options(joinedload(Image.analysis_result))

@@ -22,5 +22,6 @@ class DuplicateAnalyzer(BaseAnalyzer):
         return {
             "phash": phash_str,
             "is_duplicate": False,
-            "duplicate_of": None
+            "duplicate_of": None,
+            "similarity": None
         }

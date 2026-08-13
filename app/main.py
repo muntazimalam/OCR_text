@@ -23,9 +23,10 @@ def _sync_schema():
         return
 
     existing_cols = {c["name"] for c in inspector.get_columns("analysis_results")}
+    dialect = engine.dialect
     for column in AnalysisResult.__table__.columns:
         if column.name not in existing_cols:
-            col_type = str(column.type)
+            col_type = column.type.compile(dialect=dialect)
             ddl = f'ALTER TABLE analysis_results ADD COLUMN "{column.name}" {col_type}'
             with engine.begin() as conn:
                 conn.execute(text(ddl))
@@ -61,7 +62,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -26,6 +26,8 @@ class BrightnessAnalysis(BaseModel):
 class DuplicateAnalysis(BaseModel):
     is_duplicate: bool
     duplicate_of: Optional[UUID] = None
+    phash: Optional[str] = None
+    similarity: Optional[int] = None
 
 
 class OCRAnalysis(BaseModel):

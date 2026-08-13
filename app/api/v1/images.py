@@ -12,7 +12,7 @@ from app.schemas.analysis import AnalysisResultResponse, DetailedAnalysisSchema
 from app.services.image_service import ImageService
 from app.services.storage_service import StorageService
 from app.utils.file_utils import calculate_sha256
-from app.utils.validators import validate_uploaded_file
+from app.utils.validators import validate_uploaded_file, read_upload_with_size_limit
 from app.workers.tasks import process_image, run_image_processing_standalone
 from app.core.config import settings
 from app.core.logging import logger
@@ -26,7 +26,7 @@ async def upload_image(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    file_bytes = await file.read()
+    file_bytes = await read_upload_with_size_limit(file)
     
     content_type, width, height = validate_uploaded_file(file, file_bytes)
     
@@ -110,7 +110,7 @@ def get_image_results(image_id: uuid.UUID, db: Session = Depends(get_db)):
         detailed_analysis = DetailedAnalysisSchema(
             blur={"score": analysis.blur_score, "is_blurry": analysis.is_blurry} if analysis.blur_score is not None else None,
             brightness={"score": analysis.brightness_score, "status": analysis.brightness_status} if analysis.brightness_score is not None else None,
-            duplicate={"is_duplicate": analysis.is_duplicate, "duplicate_of": analysis.duplicate_of},
+            duplicate={"is_duplicate": analysis.is_duplicate, "duplicate_of": analysis.duplicate_of, "phash": getattr(analysis, "phash", None), "similarity": getattr(analysis, "similarity", None)},
             ocr={"text": analysis.ocr_text, "confidence": ocr_conf},
             number_plate={"detected": analysis.plate_detected, "valid": analysis.plate_valid, "confidence": analysis.plate_confidence, "plate_text": analysis.plate_text, "format_type": getattr(analysis, "plate_format", None)},
             metadata=analysis.metadata_info,
